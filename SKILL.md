@@ -8,7 +8,14 @@ license: MIT
 
 Generate a technical solution that is as small as possible while remaining unambiguous, reviewable, implementable, and safe to roll out.
 
-The design rules live in `docs/v1-design.md`. The structured source contract lives in `schemas/solution.schema.json`.
+Read only the references needed for the current stage:
+
+- `references/scoping-rules.md` before deciding depth;
+- `references/representation-rules.md` before choosing text/table/diagram;
+- `references/review-rules.md` before handoff;
+- `adapters/archify.md` or `adapters/mermaid.md` only when that diagram engine is selected.
+
+The structured source contract is `schemas/solution.schema.json`.
 
 ## Core law
 
@@ -16,148 +23,149 @@ The design rules live in `docs/v1-design.md`. The structured source contract liv
 
 Never add a section, diagram, table, alternative, metric, or infrastructure component merely because a template supports it.
 
-For every candidate content block ask:
-
-1. Does it remove implementation ambiguity?
-2. Does it expose a material trade-off or risk?
-3. Does it affect rollout, rollback, or verification?
-4. Does it preserve rationale future maintainers would otherwise lose?
-
-If all answers are no, omit it.
-
 ## Workflow
 
-### 1. Parse the ask
+### 1. Parse evidence
 
-Extract only what is supported by the request, attached material, repository evidence, or verified external evidence:
+Extract only supported information from the request, files, repository, or verified external sources:
 
 - facts
 - assumptions
 - unknowns
-- goals
-- non-goals
+- goals / non-goals
 - constraints
 - affected components
-- data changes
-- request/data/state flows
+- data/interface/state changes
 - rollout constraints
 
-Never silently convert an assumption or unknown into a fact.
+Never silently promote an assumption or unknown to fact.
 
-### 2. Run the Scoper
+### 2. Scope before designing
 
-Assess design pressure across:
+Apply `references/scoping-rules.md`.
 
-- change scope
-- data change
-- call-chain complexity
-- business risk
-- performance/capacity impact
-- technical uncertainty
+Assess six pressure dimensions: change scope, data change, call chain, business risk, performance/capacity, technical uncertainty.
 
-Before running a full design, apply the anti-overdesign gate from `docs/v1-design.md`.
-
-If the ask is small and already constrained by an existing implementation pattern, answer with the minimum useful blocks. A full report is not mandatory.
+If the anti-overdesign gate closes the full-design path, keep the solution minimal. A full report is not mandatory.
 
 ### 3. Build the simplest production-viable design first
 
-Start from the smallest design that satisfies the stated goals and constraints.
+Start from the smallest design that meets the stated goal and constraints.
 
-Do not create alternatives by default. Add an alternative only when it is genuinely viable and differs on a load-bearing axis such as correctness, capacity, fault isolation, latency, cost, operational complexity, or delivery risk.
+Do not create alternatives by default. An alternative must remain genuinely viable and differ on a load-bearing axis such as correctness, capacity, fault isolation, latency, cost, operational complexity, or delivery risk.
 
 Three alternatives is a ceiling, not a target.
 
-### 4. Run Research Gate only when material
+### 4. Research only material unknowns
 
-Research only when an unknown can change the design, for example a new framework, middleware, protocol, external API, version constraint, transaction semantic, limit, or failure mode.
+Use Research Gate only when an unknown can change the design: new middleware/framework/protocol, version/API limit, transaction/failure semantics, external service contract, or explicitly requested verification.
 
-Keep research evidence concise in the final solution. Do not turn the technical solution into a research dump.
+Keep research evidence concise in the final artifact.
 
-### 5. Select content blocks dynamically
+### 5. Select Blocks dynamically
 
-Use only necessary blocks from the V1 model:
+Candidate block types:
 
 `summary`, `context`, `goals`, `change_set`, `architecture`, `flow`, `interfaces`, `data`, `decisions`, `non_functional`, `rollout`, `verification`, `risks`.
 
-Every included block must have an explicit `reason`.
+Every included block must have `importance` and `reason`.
 
-### 6. Select the simplest representation that preserves meaning
+A block exists only when deleting it would create ambiguity, hide a material trade-off/risk, weaken rollout/verification, or lose important rationale.
 
-Default routing:
+### 6. Select the simplest representation
 
-- simple fact or rationale → text
-- structured fields/comparisons/impact/risk → table
-- small before/after → table or cards
-- services/components/boundaries → architecture
-- cross-participant call order → sequence
+Apply `references/representation-rules.md`.
+
+- simple fact/rationale → text
+- structured fields/risks/contracts → table
+- a few parallel conclusions → cards
+- components/boundaries → architecture
+- ordered cross-participant calls → sequence
 - branches/process/runbook → workflow
 - source/transform/store/consumer → dataflow
-- state/retry/wait/terminal → lifecycle
-- entity/table relationships → ER
-- project phases with meaningful time dependencies → Gantt
+- states/retries/terminal paths → lifecycle
+- entity relationships → ER
+- meaningful time dependencies → Gantt
 
 A diagram is justified only when it communicates relationships or ordering materially better than text/table.
 
-### 7. Route diagrams
+### 7. Route diagrams deterministically
 
-Prefer Archify for:
+Prefer Archify for architecture, sequence, workflow, dataflow and lifecycle.
 
-- architecture
-- sequence
-- workflow
-- dataflow
-- lifecycle
+Use Mermaid as a secondary fallback for ER, Gantt and other deliberately simple secondary diagrams.
 
-Use Mermaid only as a fallback for representations Archify does not naturally cover, such as ER, Class, Gantt, Git graph, or a deliberately simple non-core diagram.
-
-The router decides whether and what to draw. The renderer must not invent extra topology.
+The Skill decides whether and what to draw. The engine must not invent topology.
 
 ### 8. Write `solution.json`
 
 `solution.json` is the source of truth.
 
-Store semantic content and typed diagram source. Do not store generated SVG/HTML as authoritative content.
+Store semantic content and typed diagram source, never generated SVG/HTML as authoritative data.
 
-Every block and representation must record why it exists.
+For Archify blocks, store the actual Archify Typed JSON Source in `representation.spec`.
 
-### 9. Render HTML
+### 9. Validate, review and simplify
 
-Render only blocks present in `solution.json`.
+When shell access is available:
 
-The HTML must:
+```bash
+node bin/hrth.mjs validate solution.json
+node bin/hrth.mjs review solution.json
+```
 
-- answer why / what / risk quickly on the first screen;
-- use a dynamic navigation based on actual blocks;
-- use diagrams for relationships, tables for structure, prose for explanation;
-- avoid fake KPIs, decorative charts, and repeated restatements;
-- remain readable without requiring presentation-mode theatrics.
+If deterministic low-value blocks are found, simplify to a new file:
 
-### 10. Review and simplify
+```bash
+node bin/hrth.mjs simplify solution.json solution.simplified.json
+```
 
-Run four checks before delivery:
+Never overwrite the source without explicit user intent.
 
-- completeness relative to the selected design scope
-- consistency between prose, tables, diagrams, names, before/after states
-- evidence discipline for facts, assumptions, unknowns
-- overdesign removal
+### 10. Compile selected diagrams
 
-Explicitly delete:
+Export sources:
 
-- data design when data does not change;
-- deployment diagrams when deployment does not change;
-- ADR comparisons without a real choice;
-- diagrams that a short table or paragraph expresses better;
-- nodes unrelated to this change;
-- duplicated explanation already conveyed better elsewhere.
+```bash
+node bin/hrth.mjs diagrams solution.json .hrth/diagrams
+```
 
-## Quality target
+When Archify is available, follow `adapters/archify.md`: validate and deliver each selected Archify source to `<block-id>.html` in that directory.
 
-A successful result is not the longest or most complete report.
+Do not claim Archify validation if the external deliver step did not run successfully.
 
-It is a solution where:
+### 11. Render HTML
 
-- a simple change stays simple;
-- a complex change exposes the necessary complexity;
-- every visual has a reason to exist;
-- important decisions are traceable to facts, constraints, or explicit assumptions;
-- an engineer can implement it and a reviewer can challenge it without reverse-engineering the document.
+Without compiled diagrams:
+
+```bash
+node bin/hrth.mjs render solution.json solution.html
+```
+
+With compiled diagram artifacts:
+
+```bash
+node bin/hrth.mjs render solution.json solution.html --diagram-dir .hrth/diagrams
+```
+
+Render only actual blocks. Navigation is dynamic. The first screen should answer why, what changes, design pressure and review state quickly.
+
+### 12. Handoff discipline
+
+Before delivery:
+
+- run review again;
+- ensure simple changes stayed simple;
+- ensure every diagram and decision has a material reason;
+- state unresolved material unknowns honestly;
+- report whether diagrams are compiled Archify/Mermaid artifacts or semantic fallbacks.
+
+## Regression anchors
+
+Use the three Golden Cases when changing scoping, routing, rendering, or review behavior:
+
+- `examples/01-simple-field`: low pressure, 0 diagrams;
+- `examples/02-redis-cache`: medium pressure, intentionally 0 diagrams;
+- `examples/03-kafka-async`: high pressure, exactly 2 justified Archify diagrams.
+
+Run `npm test` after changes.

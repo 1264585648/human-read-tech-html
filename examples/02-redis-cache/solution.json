@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "0.1",
+  "title": "用户画像查询增加 Redis 缓存",
+  "summary": "在用户画像查询路径增加 cache-aside 缓存，以降低重复读数据库压力，同时明确 TTL、失效、穿透和降级边界。",
+  "meta": { "status": "draft", "version": "v1", "scope": "Profile Query", "confidence": "medium" },
+  "scoping": {
+    "fullDesignRequired": true,
+    "pressure": "medium",
+    "reasons": ["引入新的缓存数据副本", "命中、回源、失效和降级会影响正确性", "不改变服务拓扑且已有 Redis 能力"],
+    "dimensions": {
+      "changeScope": "low", "dataChange": "medium", "callChain": "medium",
+      "businessRisk": "medium", "performanceCapacity": "medium", "technicalUncertainty": "low"
+    }
+  },
+  "evidence": {
+    "facts": [
+      { "text": "目标是减少用户画像重复查询对数据库的读取压力。", "source": "示例需求" },
+      { "text": "方案沿用现有 Redis 基础设施，不新增独立缓存集群。", "source": "示例约束" }
+    ],
+    "assumptions": [
+      { "text": "业务可接受最多 60 秒的画像数据陈旧。", "source": "方案假设", "material": true }
+    ],
+    "unknowns": [
+      { "text": "上线前需要用真实流量确认热点用户比例和目标命中率。", "source": "待压测", "material": true }
+    ]
+  },
+  "blocks": [
+    {
+      "id":"context","type":"context","title":"问题与边界","importance":"high",
+      "reason":"需要先限定优化对象，避免把缓存改造成新的系统事实源。",
+      "representation":{"kind":"text","engine":"native","reason":"边界结论简单，文字最直接。"},
+      "content":{"body":"当前画像查询每次直读数据库。本次只优化读路径；数据库仍是唯一事实源，缓存失败不得阻断核心查询。"}
+    },
+    {
+      "id":"goals","type":"goals","title":"目标与非目标","importance":"high",
+      "reason":"缓存方案最容易因目标不清演变成一致性重构，因此必须明确边界。",
+      "representation":{"kind":"cards","engine":"native","reason":"目标、非目标、约束是三个并列结论。"},
+      "content":{"cards":[
+        {"tag":"Goal","title":"降低重复读","body":"热点画像优先从 Redis 返回，减少 DB 读压力。"},
+        {"tag":"Non-goal","title":"不改变事实源","body":"不把 Redis 作为持久化或写入事实源。"},
+        {"tag":"Constraint","title":"可降级","body":"Redis 不可用时直接回源数据库。"}
+      ]}
+    },
+    {
+      "id":"change","type":"change_set","title":"改造点","importance":"high",
+      "reason":"开发需要看到读取、写回和失效三个具体改造面。",
+      "representation":{"kind":"table","engine":"native","reason":"多个改造点及行为适合表格。"},
+      "content":{"columns":[{"key":"area","label":"改造面"},{"key":"behavior","label":"行为"}],"rows":[
+        {"area":"读取","behavior":"先查 Redis；未命中回源 DB"},
+        {"area":"回填","behavior":"DB 查询成功后写缓存并设置 TTL"},
+        {"area":"更新","behavior":"画像写成功后删除对应缓存键"},
+        {"area":"异常","behavior":"Redis 超时/不可用时快速回源，不阻断查询"}
+      ]}
+    },
+    {
+      "id":"flow","type":"flow","title":"查询链路","importance":"high",
+      "reason":"链路只有命中、未命中、缓存异常三个简单分支，步骤卡比时序图更节制。",
+      "representation":{"kind":"cards","engine":"native","reason":"参与者少且顺序简单，不值得额外画 Sequence。"},
+      "content":{"cards":[
+        {"title":"1. 查缓存","body":"以 profile:{userId} 查询 Redis。"},
+        {"title":"2. 命中直接返回","body":"缓存存在时直接返回画像。"},
+        {"title":"3. 未命中回源","body":"读取 DB，成功后回填缓存。"},
+        {"title":"4. Redis 故障降级","body":"快速失败并直接查 DB。"}
+      ]}
+    },
+    {
+      "id":"data","type":"data","title":"缓存数据设计","importance":"high",
+      "reason":"Key、TTL、失效和陈旧窗口是缓存正确性的核心。",
+      "representation":{"kind":"table","engine":"native","reason":"缓存参数需要结构化核对。"},
+      "content":{"columns":[{"key":"item","label":"项"},{"key":"design","label":"设计"}],"rows":[
+        {"item":"Key","design":"profile:{userId}"},
+        {"item":"TTL","design":"60 秒；上线后依据命中率与更新频率调整"},
+        {"item":"写后失效","design":"数据库写成功后删除缓存"},
+        {"item":"穿透","design":"对确定不存在的用户使用短 TTL 空值缓存或请求合并，按现网风险选择"},
+        {"item":"事实源","design":"数据库"}
+      ]}
+    },
+    {
+      "id":"risks","type":"risks","title":"主要风险","importance":"high",
+      "reason":"缓存引入的数据陈旧和击穿风险会影响上线策略。",
+      "representation":{"kind":"table","engine":"native","reason":"风险、触发和措施适合逐项对应。"},
+      "content":{"columns":[{"key":"risk","label":"风险"},{"key":"mitigation","label":"措施"}],"rows":[
+        {"risk":"短时数据陈旧","mitigation":"写后删除 + 60 秒 TTL，并确认业务可接受窗口"},
+        {"risk":"热点 Key 回源放大","mitigation":"监控 miss 峰值；必要时增加请求合并"},
+        {"risk":"Redis 故障拖慢查询","mitigation":"独立短超时，失败立即回源"}
+      ]}
+    },
+    {
+      "id":"verification","type":"verification","title":"验证与观测","importance":"high",
+      "reason":"只有同时验证性能收益和降级正确性，缓存才值得上线。",
+      "representation":{"kind":"cards","engine":"native","reason":"验收点并列，卡片最易扫描。"},
+      "content":{"cards":[
+        {"title":"功能","body":"命中、miss、更新后失效均符合预期。"},
+        {"title":"降级","body":"模拟 Redis 超时/不可用，查询仍能回源成功。"},
+        {"title":"指标","body":"观察命中率、Redis 延迟、DB QPS、回源量和错误率。"}
+      ]}
+    },
+    {
+      "id":"rollout","type":"rollout","title":"上线策略","importance":"medium",
+      "reason":"缓存效果依赖真实热点分布，必须支持渐进打开和快速关闭。",
+      "representation":{"kind":"text","engine":"native","reason":"无需部署变化，一段灰度策略足够。"},
+      "content":{"body":"通过开关按实例或流量比例灰度打开缓存；若 DB QPS、错误率或 Redis 延迟恶化，关闭开关恢复直读 DB。"}
+    }
+  ]
+}
