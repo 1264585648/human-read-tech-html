@@ -113,6 +113,26 @@ const kafka = readCase('03-kafka-async');
 }
 
 {
+  const html = renderSolutionHtml(simple);
+  assert.ok(html.includes('class="source-ref"'));
+  assert.ok(html.includes('本次只增加订单查询响应字段。'));
+  assert.ok(html.includes('title="原始 ID：fact-field-only'));
+  assert.ok(!html.includes('<code>fact-field-only</code>'));
+  assert.ok(html.includes('data-nav-link'));
+  assert.ok(html.includes('class="nav-group" open'));
+  assert.ok(html.includes('updateActiveNav'));
+  assert.ok(html.includes("setAttribute('aria-current', 'location')"));
+  assert.ok(html.includes('class="importance-high"'));
+  assert.ok(html.includes('class="importance medium">medium</span>'));
+  assert.ok(html.includes('class="section section-reading"'));
+}
+
+{
+  const html = renderSolutionHtml(kafka);
+  assert.ok(html.includes('class="section section-emphasis"'));
+}
+
+{
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hrth-stale-diagram-'));
   fs.writeFileSync(path.join(tmp, 'manifest.json'), JSON.stringify({
     solution: kafka.title,
@@ -135,4 +155,4 @@ const kafka = readCase('03-kafka-async');
   assert.ok(html.includes('.embedded-diagram:fullscreen'));
 }
 
-console.log(JSON.stringify({ ok: true, negativeCases: 13, uiCases: 1 }, null, 2));
+console.log(JSON.stringify({ ok: true, negativeCases: 13, uiCases: 3 }, null, 2));
