@@ -9,7 +9,8 @@ Human Read Tech HTML owns:
 - whether a diagram exists;
 - the diagram type;
 - semantic scope and node set;
-- why the diagram is necessary.
+- why the diagram is necessary;
+- source freshness checks before embedding a compiled artifact.
 
 Archify owns:
 
@@ -26,13 +27,37 @@ For an Archify representation, `representation.spec` is the Archify typed JSON s
 
 ## Build integration
 
-The core renderer accepts `--diagram-dir <dir>`. If `<dir>/<block-id>.html` exists, that trusted diagram HTML is embedded into the final standalone solution page via `iframe srcdoc`.
+Run:
+
+```bash
+node bin/hrth.mjs diagrams solution.json .hrth/diagrams
+```
+
+The exporter writes each typed source plus `manifest.json`. Every diagram entry contains a SHA-256 `sourceHash` derived from the current `representation.spec`.
+
+Exporting a diagram also removes any existing `<block-id>.html` and `<block-id>.receipt.json` for that block. This prevents a previously compiled artifact from silently surviving a source change.
 
 A calling Agent with Archify installed should:
 
-1. extract the block's `representation.spec` to a temporary JSON file;
-2. run Archify `validate`/`deliver` using the matching type;
+1. read the matching source file and `sourceHash` from `manifest.json`;
+2. run Archify `validate` / `deliver` using the matching type;
 3. save the delivered HTML as `<diagram-dir>/<block-id>.html`;
-4. run `hrth render solution.json solution.html --diagram-dir <diagram-dir>`.
+4. optionally save `<diagram-dir>/<block-id>.receipt.json` after successful validation/delivery;
+5. run `hrth render solution.json solution.html --diagram-dir <diagram-dir>`.
+
+Recommended receipt shape:
+
+```json
+{
+  "sourceHash": "<manifest sourceHash>",
+  "compiler": "archify",
+  "compilerVersion": "<version>",
+  "validated": true
+}
+```
+
+When rendering with `--diagram-dir`, Human Read Tech HTML compares the current `representation.spec` hash with the manifest. A hash mismatch, missing artifact, or invalid receipt causes an honest semantic fallback instead of embedding the questionable HTML.
+
+The embedded diagram iframe uses `sandbox="allow-scripts"` without `allow-same-origin`, and `referrerpolicy="no-referrer"`, so interactive diagram JavaScript remains isolated from the parent technical-solution page.
 
 If no precompiled artifact exists, Human Read Tech HTML renders a semantic fallback for architecture/sequence so the report remains readable without pretending Archify validation occurred.
