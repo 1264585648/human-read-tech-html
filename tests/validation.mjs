@@ -128,6 +128,11 @@ const kafka = readCase('03-kafka-async');
   assert.ok(!html.includes('stale artifact'));
   assert.ok(html.includes('valid artifact'));
   assert.ok(html.includes('sandbox="allow-scripts"'));
+  assert.ok(html.includes('allow="fullscreen"'));
+  assert.ok(html.includes('allowfullscreen'));
+  assert.ok(html.includes('data-diagram-fullscreen'));
+  assert.ok(html.includes('requestFullscreen'));
+  assert.ok(html.includes('.embedded-diagram:fullscreen'));
 }
 
-console.log(JSON.stringify({ ok: true, negativeCases: 13 }, null, 2));
+console.log(JSON.stringify({ ok: true, negativeCases: 13, uiCases: 1 }, null, 2));
