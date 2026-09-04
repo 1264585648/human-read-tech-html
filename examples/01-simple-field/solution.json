@@ -14,8 +14,8 @@
   },
   "evidence": {
     "facts": [
-      { "text": "本次只增加订单查询响应字段。", "source": "示例需求" },
-      { "text": "新增字段按可选字段处理，不要求旧客户端同步升级。", "source": "方案约束" }
+      { "id": "fact-field-only", "text": "本次只增加订单查询响应字段。", "source": "示例需求" },
+      { "id": "fact-optional-compatible", "text": "新增字段按可选字段处理，不要求旧客户端同步升级。", "source": "方案约束" }
     ],
     "assumptions": [],
     "unknowns": []
@@ -24,6 +24,7 @@
     {
       "id": "context", "type": "context", "title": "背景与目标", "importance": "high",
       "reason": "开发需要明确这次只是响应契约扩展，而不是订单模型重构。",
+      "sourceRefs": ["fact-field-only"],
       "representation": { "kind": "text", "engine": "native", "reason": "单一事实用短文本比图更清楚。" },
       "content": { "body": "订单查询需要向调用方补充订单来源信息。本次仅扩展响应字段，保持旧调用方行为不变。" }
     },
@@ -43,6 +44,7 @@
     {
       "id": "interface", "type": "interfaces", "title": "接口契约", "importance": "high",
       "reason": "新增字段的类型、兼容策略和缺省行为直接影响联调。",
+      "sourceRefs": ["fact-optional-compatible"],
       "representation": { "kind": "table", "engine": "native", "reason": "接口字段天然适合表格。" },
       "content": {
         "columns": [{"key":"field","label":"字段"},{"key":"type","label":"类型"},{"key":"required","label":"必填"},{"key":"behavior","label":"行为"}],

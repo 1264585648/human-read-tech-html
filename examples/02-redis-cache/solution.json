@@ -14,20 +14,21 @@
   },
   "evidence": {
     "facts": [
-      { "text": "目标是减少用户画像重复查询对数据库的读取压力。", "source": "示例需求" },
-      { "text": "方案沿用现有 Redis 基础设施，不新增独立缓存集群。", "source": "示例约束" }
+      { "id": "fact-db-read-pressure", "text": "目标是减少用户画像重复查询对数据库的读取压力。", "source": "示例需求" },
+      { "id": "fact-existing-redis", "text": "方案沿用现有 Redis 基础设施，不新增独立缓存集群。", "source": "示例约束" }
     ],
     "assumptions": [
-      { "text": "业务可接受最多 60 秒的画像数据陈旧。", "source": "方案假设", "material": true }
+      { "id": "assumption-stale-60s", "text": "业务可接受最多 60 秒的画像数据陈旧。", "source": "方案假设", "material": true }
     ],
     "unknowns": [
-      { "text": "上线前需要用真实流量确认热点用户比例和目标命中率。", "source": "待压测", "material": true }
+      { "id": "unknown-hotspot-rate", "text": "上线前需要用真实流量确认热点用户比例和目标命中率。", "source": "待压测", "material": true }
     ]
   },
   "blocks": [
     {
       "id":"context","type":"context","title":"问题与边界","importance":"high",
       "reason":"需要先限定优化对象，避免把缓存改造成新的系统事实源。",
+      "sourceRefs":["fact-db-read-pressure","fact-existing-redis"],
       "representation":{"kind":"text","engine":"native","reason":"边界结论简单，文字最直接。"},
       "content":{"body":"当前画像查询每次直读数据库。本次只优化读路径；数据库仍是唯一事实源，缓存失败不得阻断核心查询。"}
     },
@@ -66,6 +67,7 @@
     {
       "id":"data","type":"data","title":"缓存数据设计","importance":"high",
       "reason":"Key、TTL、失效和陈旧窗口是缓存正确性的核心。",
+      "sourceRefs":["assumption-stale-60s"],
       "representation":{"kind":"table","engine":"native","reason":"缓存参数需要结构化核对。"},
       "content":{"columns":[{"key":"item","label":"项"},{"key":"design","label":"设计"}],"rows":[
         {"item":"Key","design":"profile:{userId}"},
@@ -78,6 +80,7 @@
     {
       "id":"risks","type":"risks","title":"主要风险","importance":"high",
       "reason":"缓存引入的数据陈旧和击穿风险会影响上线策略。",
+      "sourceRefs":["unknown-hotspot-rate"],
       "representation":{"kind":"table","engine":"native","reason":"风险、触发和措施适合逐项对应。"},
       "content":{"columns":[{"key":"risk","label":"风险"},{"key":"mitigation","label":"措施"}],"rows":[
         {"risk":"短时数据陈旧","mitigation":"写后删除 + 60 秒 TTL，并确认业务可接受窗口"},

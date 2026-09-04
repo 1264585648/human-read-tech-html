@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { validateSolution, reviewSolution, simplifySolution } from '../src/core.mjs';
 import { renderSolutionHtml } from '../src/render.mjs';
 
@@ -11,6 +12,24 @@ function usage(code = 0) {
 
 function readJson(file) {
   return JSON.parse(fs.readFileSync(path.resolve(file), 'utf8'));
+}
+
+function hashSpec(value) {
+  return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+function removeIfExists(file) {
+  if (fs.existsSync(file)) fs.rmSync(file);
+}
+
+function readManifest(file) {
+  if (!fs.existsSync(file)) return { diagrams: [] };
+  try {
+    const value = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return Array.isArray(value?.diagrams) ? value : { diagrams: [] };
+  } catch {
+    return { diagrams: [] };
+  }
 }
 
 const [, , command, ...args] = process.argv;
@@ -48,11 +67,20 @@ if (command === 'diagrams') {
   }
   const outDir = path.resolve(args[1]);
   fs.mkdirSync(outDir, { recursive: true });
+  const manifestFile = path.join(outDir, 'manifest.json');
+  const previousManifest = readManifest(manifestFile);
   const manifest = [];
   for (const block of solution.blocks ?? []) {
     const rep = block.representation ?? {};
     if (!['architecture','sequence','workflow','dataflow','lifecycle','er','gantt'].includes(rep.kind)) continue;
     let sourceFile = null;
+    const expectedHtml = `${block.id}.html`;
+    const sourceHash = hashSpec(rep.spec ?? {});
+    const previous = previousManifest.diagrams.find(item => item?.id === block.id);
+    if (!previous || previous.sourceHash !== sourceHash) {
+      removeIfExists(path.join(outDir, expectedHtml));
+      removeIfExists(path.join(outDir, `${block.id}.receipt.json`));
+    }
     if (rep.engine === 'archify') {
       sourceFile = `${block.id}.${rep.kind}.json`;
       fs.writeFileSync(path.join(outDir, sourceFile), JSON.stringify(rep.spec, null, 2) + '\n');
@@ -60,9 +88,9 @@ if (command === 'diagrams') {
       sourceFile = `${block.id}.${rep.kind}.mmd`;
       fs.writeFileSync(path.join(outDir, sourceFile), rep.spec.source.trim() + '\n');
     }
-    manifest.push({ id: block.id, kind: rep.kind, engine: rep.engine, reason: rep.reason, sourceFile, expectedHtml: `${block.id}.html` });
+    manifest.push({ id: block.id, kind: rep.kind, engine: rep.engine, reason: rep.reason, sourceFile, sourceHash, expectedHtml });
   }
-  fs.writeFileSync(path.join(outDir, 'manifest.json'), JSON.stringify({ solution: solution.title, diagrams: manifest }, null, 2) + '\n');
+  fs.writeFileSync(manifestFile, JSON.stringify({ solution: solution.title, diagrams: manifest }, null, 2) + '\n');
   console.log(JSON.stringify({ ok: true, outputDir: outDir, diagrams: manifest }, null, 2));
   process.exit(0);
 }
@@ -70,6 +98,7 @@ if (command === 'diagrams') {
 if (command === 'render') {
   if (!args[0] || !args[1]) usage(1);
   const diagramFlag = args.indexOf('--diagram-dir');
+  if (diagramFlag >= 0 && !args[diagramFlag + 1]) usage(1);
   const diagramDir = diagramFlag >= 0 ? path.resolve(args[diagramFlag + 1]) : null;
   const solution = readJson(args[0]);
   const html = renderSolutionHtml(solution, { diagramDir });

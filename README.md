@@ -4,6 +4,18 @@
 
 它不是固定技术方案模板。核心流程是先判断“这个需求值得设计到什么深度”，再决定需要哪些内容，以及用文字、表格还是图来表达。
 
+## V1.1 收口
+
+在 V1 的“防过度设计”基础上补齐可靠性边界，不扩大产品范围：
+
+- 六个 Scoping 压力维度必须完整；
+- Evidence 使用稳定 `id`，Block 可通过 `sourceRefs` 追溯事实/假设/待确认；
+- Validator 补齐 Block ID、`content`、Evidence 引用和 Archify 关键引用检查；
+- Review 增加高风险验证、上线回滚、调用链和数据变化的确定性 completeness 提醒；
+- Diagram manifest 记录 `sourceHash`，重新导出时清理旧 HTML，Render 拒绝 hash 不一致的旧图；
+- 嵌入图使用 sandboxed iframe；
+- 在 3 个 Golden Cases 外增加 negative regression tests。
+
 ## V1 已完成
 
 - Scoper：六个设计压力维度 + Anti-overdesign Gate
@@ -56,7 +68,7 @@ solution.json
 要求 Node.js 20+，V1 无第三方 npm 运行依赖。
 
 ```bash
-# 校验结构和路由
+# 校验结构、六维 scoping、Evidence 引用和图表路由
 node bin/hrth.mjs validate examples/01-simple-field/solution.json
 
 # 运行完整 Review
@@ -65,15 +77,37 @@ node bin/hrth.mjs review examples/03-kafka-async/solution.json
 # 保守精简，永远写新文件，不原地修改
 node bin/hrth.mjs simplify solution.json solution.simplified.json
 
-# 导出 Archify / Mermaid typed source
+# 导出 Archify / Mermaid typed source，并写 sourceHash manifest
 node bin/hrth.mjs diagrams examples/03-kafka-async/solution.json .hrth/diagrams
 
 # 生成自包含 HTML
 node bin/hrth.mjs render examples/03-kafka-async/solution.json solution.html
 
-# 如果 Archify 已把 <block-id>.html 编译到目录，构建时直接嵌入正式图
+# 如果 Archify 已把 <block-id>.html 编译到目录，构建时校验 hash 后嵌入正式图
 node bin/hrth.mjs render solution.json solution.html --diagram-dir .hrth/diagrams
 ```
+
+## Evidence 追溯
+
+每条 Fact / Assumption / Unknown 都有稳定 ID：
+
+```json
+{
+  "id": "fact-current-sync-call",
+  "text": "当前后处理位于同步请求链路。",
+  "source": "repository evidence"
+}
+```
+
+Block 在结论依赖该证据时使用：
+
+```json
+{
+  "sourceRefs": ["fact-current-sync-call"]
+}
+```
+
+Validator 会拒绝不存在的 Evidence 引用，最终 HTML 也会显示这些引用，方便评审追溯。
 
 ## Archify 集成
 
@@ -94,6 +128,8 @@ node bin/hrth.mjs diagrams solution.json .hrth/diagrams
 └── manifest.json
 ```
 
+`manifest.json` 为每张图记录 `sourceHash`。重新导出 source 时，CLI 会先删除对应旧 HTML/receipt，避免旧图静默残留。
+
 由 Agent 调用 Archify 对每个 JSON 执行 `validate` / `deliver`，并将结果保存成：
 
 ```text
@@ -101,7 +137,9 @@ architecture.html
 flow.html
 ```
 
-再通过 `--diagram-dir` 嵌入最终技术方案。
+可选地在成功交付后写 `<block-id>.receipt.json`，记录同一 `sourceHash`、Archify 版本和 `validated: true`。
+
+再通过 `--diagram-dir` 嵌入最终技术方案。Render 会重新计算当前 `representation.spec` hash；不一致时拒绝嵌入并使用语义降级视图。
 
 如果 Archify 不可用，V1 对 Architecture / Sequence 提供**诚实的语义降级视图**，保证方案仍能阅读，但不会声称经过 Archify 的布局/质量校验。
 
@@ -112,6 +150,8 @@ flow.html
 | 接口增加字段 | low | 5 | 0 | 2 | 小需求绝不制造架构图 |
 | Redis 查询缓存 | medium | 8 | 0 | 3 | 中等复杂度也不强制画图 |
 | Kafka 异步后处理 | high | 11 | 2 | 6 | 只画拓扑变化和关键时序 |
+
+除此之外，`tests/validation.mjs` 覆盖缺维度、缺 `content`、非法 ID、Evidence 引用错误、Archify 引用错误、高风险缺验证和 stale diagram 等反例。
 
 运行全部回归：
 
@@ -144,7 +184,9 @@ human-read-tech-html/
 │   ├── 01-simple-field/
 │   ├── 02-redis-cache/
 │   └── 03-kafka-async/
-└── tests/golden.mjs
+└── tests/
+    ├── golden.mjs
+    └── validation.mjs
 ```
 
 ## V1 明确不做
