@@ -10,22 +10,41 @@ const ENGINES = new Set(['native','archify','mermaid','none']);
 const DIAGRAM_KINDS = new Set(['architecture','sequence','workflow','dataflow','lifecycle','er','gantt']);
 const ARCHIFY_KINDS = new Set(['architecture','sequence','workflow','dataflow','lifecycle']);
 const MERMAID_KINDS = new Set(['er','gantt']);
+const READING_ROLES = new Set(['core','detail','reference']);
+const READING_GROUPS = new Set(['overview','design','decisions','delivery','details','appendix']);
+const READING_GROUP_ORDER = ['overview','design','decisions','delivery','details','appendix'];
+const READING_GROUP_TITLES = {
+  overview: '先看结论',
+  design: '方案怎么工作',
+  decisions: '为什么这样设计',
+  delivery: '如何安全上线',
+  details: '实现细节',
+  appendix: '依据与附录'
+};
 const REQUIRED_DIMENSIONS = [
   'changeScope','dataChange','callChain','businessRisk','performanceCapacity','technicalUncertainty'
 ];
 const ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
-const ROOT_KEYS = new Set(['schemaVersion','title','summary','meta','scoping','evidence','blocks']);
+const ROOT_KEYS = new Set(['schemaVersion','title','summary','brief','meta','scoping','evidence','blocks']);
+const BRIEF_KEYS = new Set(['bottomLine','keyChanges','impact','keyRisks','delivery']);
 const META_KEYS = new Set(['status','version','scope','confidence']);
 const SCOPING_KEYS = new Set(['fullDesignRequired','pressure','reasons','dimensions']);
 const EVIDENCE_KEYS = new Set(['facts','assumptions','unknowns']);
 const EVIDENCE_ITEM_KEYS = new Set(['id','text','source','material']);
-const BLOCK_KEYS = new Set(['id','type','title','importance','reason','representation','content','sourceRefs']);
+const BLOCK_KEYS = new Set(['id','type','title','importance','reason','reading','representation','content','sourceRefs']);
+const READING_KEYS = new Set(['role','group']);
 const REPRESENTATION_KEYS = new Set(['kind','engine','reason','spec']);
 
 export const BUDGETS = {
   low: { diagrams: 1, tables: 2, blocks: 6 },
   medium: { diagrams: 3, tables: 4, blocks: 9 },
   high: { diagrams: Infinity, tables: Infinity, blocks: Infinity }
+};
+
+export const READING_BUDGETS = {
+  low: { groups: 3, briefPoints: 5, coreBlocks: 5 },
+  medium: { groups: 5, briefPoints: 7, coreBlocks: 7 },
+  high: { groups: 6, briefPoints: 8, coreBlocks: 8 }
 };
 
 function finding(code, severity, message, blockId = null) {
@@ -57,6 +76,37 @@ function validateId(value, code, label, errors, blockId = null) {
     return false;
   }
   return true;
+}
+
+function validateStringArray(value, { code, label, min = 0, max = Infinity, unique = false }, errors) {
+  if (!Array.isArray(value)) {
+    errors.push(finding(code, 'error', `${label} must be an array.`));
+    return;
+  }
+  if (value.length < min || value.length > max) {
+    const range = Number.isFinite(max) ? `${min}–${max}` : `at least ${min}`;
+    errors.push(finding(`${code}.length`, 'error', `${label} must contain ${range} items.`));
+  }
+  const seen = new Set();
+  for (const item of value) {
+    if (!nonEmpty(item)) errors.push(finding(`${code}.item`, 'error', `Every ${label} item must be non-empty.`));
+    if (unique && seen.has(item)) errors.push(finding(`${code}.duplicate`, 'error', `${label} must not contain duplicate items.`));
+    seen.add(item);
+  }
+}
+
+function validateBrief(brief, errors) {
+  if (brief === undefined) return;
+  if (!isObject(brief)) {
+    errors.push(finding('brief.type', 'error', 'brief must be an object.'));
+    return;
+  }
+  rejectUnknownKeys(brief, BRIEF_KEYS, 'brief.additional_property', errors);
+  if (!nonEmpty(brief.bottomLine)) errors.push(finding('brief.bottom_line', 'error', 'brief.bottomLine is required.'));
+  validateStringArray(brief.keyChanges, { code: 'brief.key_changes', label: 'brief.keyChanges', min: 1, max: 5, unique: true }, errors);
+  validateStringArray(brief.keyRisks, { code: 'brief.key_risks', label: 'brief.keyRisks', min: 0, max: 3, unique: true }, errors);
+  if (brief.impact !== undefined && !nonEmpty(brief.impact)) errors.push(finding('brief.impact', 'error', 'brief.impact must be a non-empty string.'));
+  if (brief.delivery !== undefined && !nonEmpty(brief.delivery)) errors.push(finding('brief.delivery', 'error', 'brief.delivery must be a non-empty string.'));
 }
 
 function validateArchifyReferences(rep, errors, blockId) {
@@ -112,6 +162,77 @@ export function countRepresentations(solution) {
   return { blocks: blocks.length, diagrams, tables };
 }
 
+function defaultReading(block, solution, blocks) {
+  const dims = solution?.scoping?.dimensions ?? {};
+  const hasCoreCallView = blocks.some(candidate => ['architecture','flow'].includes(candidate?.type));
+  switch (block?.type) {
+    case 'summary':
+    case 'context':
+    case 'goals':
+    case 'change_set':
+      return { role: 'core', group: 'overview' };
+    case 'architecture':
+    case 'flow':
+      return { role: 'core', group: 'design' };
+    case 'decisions':
+      return { role: 'core', group: 'decisions' };
+    case 'rollout':
+    case 'verification':
+    case 'risks':
+      return { role: 'core', group: 'delivery' };
+    case 'interfaces':
+      return dims.callChain === 'high' && !hasCoreCallView
+        ? { role: 'core', group: 'design' }
+        : { role: 'detail', group: 'details' };
+    case 'data':
+      return dims.dataChange === 'high'
+        ? { role: 'core', group: 'design' }
+        : { role: 'detail', group: 'details' };
+    case 'non_functional':
+      return dims.performanceCapacity === 'high'
+        ? { role: 'core', group: 'design' }
+        : { role: 'detail', group: 'details' };
+    default:
+      return { role: 'detail', group: 'details' };
+  }
+}
+
+export function planReading(solution) {
+  const blocks = Array.isArray(solution?.blocks) ? solution.blocks : [];
+  const groups = new Map(READING_GROUP_ORDER.map(id => [id, {
+    id,
+    title: READING_GROUP_TITLES[id],
+    blocks: []
+  }]));
+
+  const plannedBlocks = blocks.map(block => {
+    const fallback = defaultReading(block, solution, blocks);
+    const role = READING_ROLES.has(block?.reading?.role) ? block.reading.role : fallback.role;
+    const group = READING_GROUPS.has(block?.reading?.group) ? block.reading.group : fallback.group;
+    const planned = { ...block, reading: { role, group } };
+    groups.get(group).blocks.push(planned);
+    return planned;
+  });
+
+  const visibleGroups = READING_GROUP_ORDER.map(id => groups.get(id)).filter(group => group.blocks.length > 0);
+  return {
+    groups: visibleGroups,
+    blocks: plannedBlocks,
+    coreBlocks: plannedBlocks.filter(block => block.reading.role === 'core'),
+    detailBlocks: plannedBlocks.filter(block => block.reading.role === 'detail'),
+    referenceBlocks: plannedBlocks.filter(block => block.reading.role === 'reference')
+  };
+}
+
+export function countBriefPoints(brief) {
+  if (!isObject(brief)) return 0;
+  return (nonEmpty(brief.bottomLine) ? 1 : 0)
+    + (Array.isArray(brief.keyChanges) ? brief.keyChanges.length : 0)
+    + (nonEmpty(brief.impact) ? 1 : 0)
+    + (Array.isArray(brief.keyRisks) ? brief.keyRisks.length : 0)
+    + (nonEmpty(brief.delivery) ? 1 : 0);
+}
+
 export function validateSolution(solution) {
   const errors = [];
   const warnings = [];
@@ -120,6 +241,8 @@ export function validateSolution(solution) {
   if (solution.schemaVersion !== '0.1') errors.push(finding('schema.version', 'error', 'schemaVersion must be "0.1".'));
   if (!nonEmpty(solution.title)) errors.push(finding('title.required', 'error', 'title is required.'));
   if (solution.summary !== undefined && typeof solution.summary !== 'string') errors.push(finding('summary.type', 'error', 'summary must be a string.'));
+  validateBrief(solution.brief, errors);
+
   if (solution.meta !== undefined) {
     if (!isObject(solution.meta)) errors.push(finding('meta.type', 'error', 'meta must be an object.'));
     else {
@@ -143,10 +266,6 @@ export function validateSolution(solution) {
       rejectUnknownKeys(scoping.dimensions, new Set(REQUIRED_DIMENSIONS), 'scoping.dimension.unknown', errors);
       for (const key of REQUIRED_DIMENSIONS) {
         if (!PRESSURE.has(scoping.dimensions[key])) errors.push(finding('scoping.dimension.required', 'error', `Missing or invalid scoping dimension: ${key}.`));
-      }
-      for (const [key, level] of Object.entries(scoping.dimensions)) {
-        if (!REQUIRED_DIMENSIONS.includes(key)) continue;
-        if (!PRESSURE.has(level)) errors.push(finding('scoping.dimension', 'error', `Invalid pressure level for ${key}.`));
       }
     }
   }
@@ -194,6 +313,15 @@ export function validateSolution(solution) {
     if (!PRESSURE.has(block.importance)) errors.push(finding('block.importance', 'error', 'Block importance must be low, medium, or high.', block.id));
     if (!nonEmpty(block.reason)) errors.push(finding('block.reason', 'error', 'Every block must explain why it exists.', block.id));
     if (!Object.prototype.hasOwnProperty.call(block, 'content')) errors.push(finding('block.content.required', 'error', 'Every block must contain content.', block.id));
+
+    if (block.reading !== undefined) {
+      if (!isObject(block.reading)) errors.push(finding('reading.type', 'error', 'Block reading must be an object.', block.id));
+      else {
+        rejectUnknownKeys(block.reading, READING_KEYS, 'reading.additional_property', errors, block.id);
+        if (!READING_ROLES.has(block.reading.role)) errors.push(finding('reading.role', 'error', 'reading.role must be core, detail, or reference.', block.id));
+        if (!READING_GROUPS.has(block.reading.group)) errors.push(finding('reading.group', 'error', 'reading.group is invalid.', block.id));
+      }
+    }
 
     if (block.sourceRefs !== undefined) {
       if (!Array.isArray(block.sourceRefs)) errors.push(finding('block.source_refs.type', 'error', 'sourceRefs must be an array.', block.id));
@@ -257,6 +385,7 @@ function primaryNodeCount(block) {
   if (Array.isArray(spec.components)) return spec.components.length;
   if (Array.isArray(spec.participants)) return spec.participants.length;
   if (Array.isArray(spec.nodes)) return spec.nodes.length;
+  if (Array.isArray(spec.states)) return spec.states.length;
   return 0;
 }
 
@@ -277,6 +406,7 @@ export function reviewSolution(solution) {
     if (block.type === 'decisions' && decisionOptionCount(block) < 2) findings.push(finding('overdesign.decision', 'warning', 'Decision block has fewer than two live options; use rationale text instead.', block.id));
     if (block.type === 'non_functional' && dims.performanceCapacity === 'low' && dims.businessRisk === 'low') findings.push(finding('overdesign.non_functional', 'warning', 'Non-functional block may be unnecessary for a low-risk change.', block.id));
     if (DIAGRAM_KINDS.has(block?.representation?.kind) && primaryNodeCount(block) > 12) findings.push(finding('diagram.density', 'warning', 'Diagram has more than 12 primary nodes; remove unrelated nodes or explain why density is necessary.', block.id));
+    if (block?.reading?.role === 'reference' && block?.reading?.group !== 'appendix') findings.push(finding('readability.reference_group', 'warning', 'Reference material should normally live in the appendix.', block.id));
   }
 
   if (dims.businessRisk === 'high' && !hasBlockType(blocks, 'verification')) {
@@ -295,6 +425,33 @@ export function reviewSolution(solution) {
   const materialUnknowns = (solution?.evidence?.unknowns ?? []).filter(x => x?.material !== false);
   if (materialUnknowns.length && solution?.meta?.confidence === 'high') findings.push(finding('evidence.confidence', 'warning', 'High confidence conflicts with material unknowns; lower confidence or resolve them.'));
 
+  const pressure = solution?.scoping?.pressure;
+  const readingPlan = planReading(solution);
+  if (PRESSURE.has(pressure)) {
+    const budget = READING_BUDGETS[pressure];
+    const explicitReadingCount = blocks.filter(block => isObject(block?.reading)).length;
+    const briefPoints = countBriefPoints(solution?.brief);
+
+    if (['medium','high'].includes(pressure) && !isObject(solution?.brief)) {
+      findings.push(finding('readability.brief.missing', 'warning', `${pressure} pressure solution should provide a BLUF brief for the first screen.`));
+    }
+    if (['medium','high'].includes(pressure) && explicitReadingCount < blocks.length) {
+      findings.push(finding('readability.metadata.missing', 'warning', `${blocks.length - explicitReadingCount} blocks rely on default reading placement; medium/high solutions should normally provide explicit reading metadata.`));
+    }
+    if (readingPlan.groups.length > budget.groups) {
+      findings.push(finding('readability.groups', 'warning', `${pressure} pressure solution exposes ${readingPlan.groups.length} first-level reading groups; budget is ${budget.groups}. Merge or move content deeper.`));
+    }
+    if (readingPlan.coreBlocks.length > budget.coreBlocks) {
+      findings.push(finding('readability.core_blocks', 'warning', `${pressure} pressure solution exposes ${readingPlan.coreBlocks.length} core blocks; budget is ${budget.coreBlocks}. Move implementation detail deeper.`));
+    }
+    if (briefPoints > budget.briefPoints) {
+      findings.push(finding('readability.brief_points', 'warning', `First-screen brief has ${briefPoints} information points; ${pressure} budget is ${budget.briefPoints}. Keep only load-bearing conclusions.`));
+    }
+    if (blocks.length > 5 && readingPlan.coreBlocks.length === blocks.length) {
+      findings.push(finding('readability.all_core', 'warning', 'Every block is exposed as core. Progressive disclosure is not working; move implementation/reference material deeper.'));
+    }
+  }
+
   const errors = findings.filter(x => x.severity === 'error');
   const warnings = findings.filter(x => x.severity === 'warning');
   return {
@@ -302,7 +459,14 @@ export function reviewSolution(solution) {
     errors,
     warnings,
     counts: countRepresentations(solution),
-    pressure: solution?.scoping?.pressure ?? null
+    pressure: pressure ?? null,
+    reading: {
+      groups: readingPlan.groups.length,
+      coreBlocks: readingPlan.coreBlocks.length,
+      detailBlocks: readingPlan.detailBlocks.length,
+      referenceBlocks: readingPlan.referenceBlocks.length,
+      briefPoints: countBriefPoints(solution?.brief)
+    }
   };
 }
 
