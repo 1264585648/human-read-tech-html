@@ -26,6 +26,22 @@ const kafka = readCase('03-kafka-async');
 
 {
   const bad = clone(simple);
+  bad.unexpected = true;
+  const result = validateSolution(bad);
+  assert.equal(result.ok, false);
+  assert.ok(hasCode(result.errors, 'root.additional_property'));
+}
+
+{
+  const bad = clone(simple);
+  bad.meta.confidence = 'certain';
+  const result = validateSolution(bad);
+  assert.equal(result.ok, false);
+  assert.ok(hasCode(result.errors, 'meta.confidence'));
+}
+
+{
+  const bad = clone(simple);
   delete bad.blocks[0].content;
   const result = validateSolution(bad);
   assert.equal(result.ok, false);
@@ -54,6 +70,14 @@ const kafka = readCase('03-kafka-async');
   const result = validateSolution(bad);
   assert.equal(result.ok, false);
   assert.ok(hasCode(result.errors, 'block.source_ref.invalid'));
+}
+
+{
+  const bad = clone(simple);
+  bad.blocks[0].sourceRefs = ['fact-field-only', 'fact-field-only'];
+  const result = validateSolution(bad);
+  assert.equal(result.ok, false);
+  assert.ok(hasCode(result.errors, 'block.source_ref.duplicate'));
 }
 
 {
@@ -106,4 +130,4 @@ const kafka = readCase('03-kafka-async');
   assert.ok(html.includes('sandbox="allow-scripts"'));
 }
 
-console.log(JSON.stringify({ ok: true, negativeCases: 10 }, null, 2));
+console.log(JSON.stringify({ ok: true, negativeCases: 13 }, null, 2));
