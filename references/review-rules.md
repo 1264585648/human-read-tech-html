@@ -36,6 +36,32 @@ These checks are warnings rather than a fixed template mandate. A justified exce
 - unknowns are not silently converted into facts;
 - a material unknown prevents unjustified `high` confidence.
 
+## Readability
+
+Apply `references/reading-rules.md` before handoff.
+
+The review asks whether a normal reader can consume the same solution at three depths without being forced through the full internal Block model.
+
+Deterministic checks:
+
+- medium/high pressure should provide a BLUF `brief` rather than relying only on a generic summary;
+- medium/high pressure should normally provide explicit `reading.role` and `reading.group` metadata for Blocks;
+- first-level reading groups must stay within the Reading Budget;
+- `core` Blocks must stay within the first-read budget;
+- the first-screen `brief` must stay within its information-point budget;
+- when every Block is `core`, progressive disclosure is probably not working;
+- `reference` material should normally live in `appendix`.
+
+Semantic review prompts:
+
+- does the brief state the selected solution, or merely repeat background;
+- can the reader understand why / what / how without opening `details`;
+- are interface/data/non-functional details promoted to core only because they are load-bearing for this change;
+- does the same conclusion appear in the brief, paragraph, card, table and diagram without adding meaning;
+- do first-level group names express reader intent rather than internal taxonomy.
+
+Do not add NLP similarity scoring or another AI review service just to automate the ambiguous checks above. Keep deterministic checks in code and leave semantic judgement to the final agent/human pass.
+
 ## Overdesign deletion rules
 
 Delete by default when:
@@ -49,5 +75,3 @@ Delete by default when:
 - the same fact is repeated in summary, cards, body and diagram.
 
 Automated simplification must remain conservative: remove only deterministic low-value blocks and write a new JSON file rather than mutating the source in place.
-
-Do not add NLP similarity scoring or an AI-based second review engine merely to detect repetition. Ambiguous semantic duplication stays a final human/agent review responsibility.
