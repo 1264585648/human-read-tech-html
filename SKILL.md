@@ -38,13 +38,15 @@ Extract only supported information from the request, files, repository, or verif
 - data/interface/state changes
 - rollout constraints
 
+Every evidence item must have a stable lowercase `id`. When a Block materially depends on specific evidence, connect it with `sourceRefs` rather than repeating or silently promoting the evidence.
+
 Never silently promote an assumption or unknown to fact.
 
 ### 2. Scope before designing
 
 Apply `references/scoping-rules.md`.
 
-Assess six pressure dimensions: change scope, data change, call chain, business risk, performance/capacity, technical uncertainty.
+Assess all six pressure dimensions: change scope, data change, call chain, business risk, performance/capacity, technical uncertainty. Do not omit a dimension because it appears irrelevant; mark it `low` instead.
 
 If the anti-overdesign gate closes the full-design path, keep the solution minimal. A full report is not mandatory.
 
@@ -105,6 +107,8 @@ Store semantic content and typed diagram source, never generated SVG/HTML as aut
 
 For Archify blocks, store the actual Archify Typed JSON Source in `representation.spec`.
 
+Every Evidence item needs a unique stable `id`; every `sourceRefs` entry must resolve to one of those ids.
+
 ### 9. Validate, review and simplify
 
 When shell access is available:
@@ -113,6 +117,10 @@ When shell access is available:
 node bin/hrth.mjs validate solution.json
 node bin/hrth.mjs review solution.json
 ```
+
+Validation checks structural requirements, all six scoping dimensions, evidence/reference integrity, representation routing, and supported Archify reference integrity.
+
+Review adds deterministic completeness and anti-overdesign checks. Treat warnings as review prompts, not a reason to manufacture fixed chapters.
 
 If deterministic low-value blocks are found, simplify to a new file:
 
@@ -130,7 +138,9 @@ Export sources:
 node bin/hrth.mjs diagrams solution.json .hrth/diagrams
 ```
 
-When Archify is available, follow `adapters/archify.md`: validate and deliver each selected Archify source to `<block-id>.html` in that directory.
+The exporter records a `sourceHash` in `manifest.json` and removes stale compiled HTML for exported Blocks before compilation.
+
+When Archify is available, follow `adapters/archify.md`: validate and deliver each selected Archify source to `<block-id>.html` in that directory. A receipt with the matching `sourceHash` is recommended after successful validation/delivery.
 
 Do not claim Archify validation if the external deliver step did not run successfully.
 
@@ -150,6 +160,8 @@ node bin/hrth.mjs render solution.json solution.html --diagram-dir .hrth/diagram
 
 Render only actual blocks. Navigation is dynamic. The first screen should answer why, what changes, design pressure and review state quickly.
 
+When a diagram manifest hash does not match the current `representation.spec`, or a supplied receipt is invalid, do not embed the artifact. Fall back honestly to the semantic representation and surface a review warning.
+
 ### 12. Handoff discipline
 
 Before delivery:
@@ -157,8 +169,10 @@ Before delivery:
 - run review again;
 - ensure simple changes stayed simple;
 - ensure every diagram and decision has a material reason;
+- ensure material Block conclusions can point to their evidence ids where needed;
 - state unresolved material unknowns honestly;
-- report whether diagrams are compiled Archify/Mermaid artifacts or semantic fallbacks.
+- report whether diagrams are compiled Archify/Mermaid artifacts or semantic fallbacks;
+- never hide a stale or unverifiable diagram artifact behind a successful-looking page.
 
 ## Regression anchors
 
@@ -167,5 +181,7 @@ Use the three Golden Cases when changing scoping, routing, rendering, or review 
 - `examples/01-simple-field`: low pressure, 0 diagrams;
 - `examples/02-redis-cache`: medium pressure, intentionally 0 diagrams;
 - `examples/03-kafka-async`: high pressure, exactly 2 justified Archify diagrams.
+
+Negative validation and stale-artifact regressions live in `tests/validation.mjs`.
 
 Run `npm test` after changes.
