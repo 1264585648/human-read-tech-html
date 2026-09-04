@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "0.1",
+  "title": "订单查询接口增加 source 字段",
+  "summary": "在现有订单查询响应中新增可选 source 字段，保持旧客户端兼容，不改变服务拓扑和数据存储。",
+  "meta": { "status": "draft", "version": "v1", "scope": "Order API", "confidence": "high" },
+  "scoping": {
+    "fullDesignRequired": false,
+    "pressure": "low",
+    "reasons": ["改动局限于单接口响应契约", "无数据存储和调用链变化", "现有兼容性模式可以直接复用"],
+    "dimensions": {
+      "changeScope": "low", "dataChange": "low", "callChain": "low",
+      "businessRisk": "low", "performanceCapacity": "low", "technicalUncertainty": "low"
+    }
+  },
+  "evidence": {
+    "facts": [
+      { "text": "本次只增加订单查询响应字段。", "source": "示例需求" },
+      { "text": "新增字段按可选字段处理，不要求旧客户端同步升级。", "source": "方案约束" }
+    ],
+    "assumptions": [],
+    "unknowns": []
+  },
+  "blocks": [
+    {
+      "id": "context", "type": "context", "title": "背景与目标", "importance": "high",
+      "reason": "开发需要明确这次只是响应契约扩展，而不是订单模型重构。",
+      "representation": { "kind": "text", "engine": "native", "reason": "单一事实用短文本比图更清楚。" },
+      "content": { "body": "订单查询需要向调用方补充订单来源信息。本次仅扩展响应字段，保持旧调用方行为不变。" }
+    },
+    {
+      "id": "change", "type": "change_set", "title": "改动点", "importance": "high",
+      "reason": "一张变更表即可无歧义说明开发改什么和不改什么。",
+      "representation": { "kind": "table", "engine": "native", "reason": "字段级变化适合结构化对照。" },
+      "content": {
+        "columns": [{"key":"item","label":"项"},{"key":"before","label":"当前"},{"key":"after","label":"调整后"}],
+        "rows": [
+          {"item":"响应 DTO","before":"无 source","after":"新增可选 source"},
+          {"item":"数据库","before":"不变","after":"不变"},
+          {"item":"服务调用链","before":"不变","after":"不变"}
+        ]
+      }
+    },
+    {
+      "id": "interface", "type": "interfaces", "title": "接口契约", "importance": "high",
+      "reason": "新增字段的类型、兼容策略和缺省行为直接影响联调。",
+      "representation": { "kind": "table", "engine": "native", "reason": "接口字段天然适合表格。" },
+      "content": {
+        "columns": [{"key":"field","label":"字段"},{"key":"type","label":"类型"},{"key":"required","label":"必填"},{"key":"behavior","label":"行为"}],
+        "rows": [{"field":"source","type":"string","required":"否","behavior":"无法确定来源时省略或返回 null，旧客户端可忽略"}]
+      }
+    },
+    {
+      "id": "verification", "type": "verification", "title": "验证", "importance": "high",
+      "reason": "需要明确兼容性和字段正确性怎么验收。",
+      "representation": { "kind": "cards", "engine": "native", "reason": "三个独立验收点用卡片比长段落更易扫描。" },
+      "content": { "cards": [
+        {"title":"新字段正确","body":"有来源的订单返回正确 source。"},
+        {"title":"缺省兼容","body":"无来源时按约定返回，接口不报错。"},
+        {"title":"旧客户端兼容","body":"忽略未知字段的旧客户端行为不变。"}
+      ] }
+    },
+    {
+      "id": "rollout", "type": "rollout", "title": "上线与回滚", "importance": "medium",
+      "reason": "虽然风险低，但字段发布顺序和回滚边界仍需要一句话说明。",
+      "representation": { "kind": "text", "engine": "native", "reason": "无迁移和灰度拓扑，短文本足够。" },
+      "content": { "body": "后端可直接先发布；旧客户端无需同步升级。若出现异常，回滚应用版本即可，不涉及数据回滚。" }
+    }
+  ]
+}
