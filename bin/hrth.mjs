@@ -22,6 +22,16 @@ function removeIfExists(file) {
   if (fs.existsSync(file)) fs.rmSync(file);
 }
 
+function readManifest(file) {
+  if (!fs.existsSync(file)) return { diagrams: [] };
+  try {
+    const value = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return Array.isArray(value?.diagrams) ? value : { diagrams: [] };
+  } catch {
+    return { diagrams: [] };
+  }
+}
+
 const [, , command, ...args] = process.argv;
 if (!command || command === '-h' || command === '--help') usage(0);
 
@@ -57,6 +67,8 @@ if (command === 'diagrams') {
   }
   const outDir = path.resolve(args[1]);
   fs.mkdirSync(outDir, { recursive: true });
+  const manifestFile = path.join(outDir, 'manifest.json');
+  const previousManifest = readManifest(manifestFile);
   const manifest = [];
   for (const block of solution.blocks ?? []) {
     const rep = block.representation ?? {};
@@ -64,8 +76,11 @@ if (command === 'diagrams') {
     let sourceFile = null;
     const expectedHtml = `${block.id}.html`;
     const sourceHash = hashSpec(rep.spec ?? {});
-    removeIfExists(path.join(outDir, expectedHtml));
-    removeIfExists(path.join(outDir, `${block.id}.receipt.json`));
+    const previous = previousManifest.diagrams.find(item => item?.id === block.id);
+    if (!previous || previous.sourceHash !== sourceHash) {
+      removeIfExists(path.join(outDir, expectedHtml));
+      removeIfExists(path.join(outDir, `${block.id}.receipt.json`));
+    }
     if (rep.engine === 'archify') {
       sourceFile = `${block.id}.${rep.kind}.json`;
       fs.writeFileSync(path.join(outDir, sourceFile), JSON.stringify(rep.spec, null, 2) + '\n');
@@ -75,7 +90,7 @@ if (command === 'diagrams') {
     }
     manifest.push({ id: block.id, kind: rep.kind, engine: rep.engine, reason: rep.reason, sourceFile, sourceHash, expectedHtml });
   }
-  fs.writeFileSync(path.join(outDir, 'manifest.json'), JSON.stringify({ solution: solution.title, diagrams: manifest }, null, 2) + '\n');
+  fs.writeFileSync(manifestFile, JSON.stringify({ solution: solution.title, diagrams: manifest }, null, 2) + '\n');
   console.log(JSON.stringify({ ok: true, outputDir: outDir, diagrams: manifest }, null, 2));
   process.exit(0);
 }
