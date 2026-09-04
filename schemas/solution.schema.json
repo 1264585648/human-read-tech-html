@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://human-read-tech-html.local/schemas/solution.schema.json",
+  "title": "Human Read Tech HTML Solution",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "title", "scoping", "evidence", "blocks"],
+  "properties": {
+    "schemaVersion": {
+      "const": "0.1"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "string"
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string" },
+        "version": { "type": "string" },
+        "scope": { "type": "string" },
+        "confidence": {
+          "enum": ["high", "medium", "low"]
+        }
+      }
+    },
+    "scoping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fullDesignRequired", "pressure", "reasons"],
+      "properties": {
+        "fullDesignRequired": { "type": "boolean" },
+        "pressure": {
+          "enum": ["low", "medium", "high"]
+        },
+        "reasons": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "changeScope": { "$ref": "#/$defs/pressureLevel" },
+            "dataChange": { "$ref": "#/$defs/pressureLevel" },
+            "callChain": { "$ref": "#/$defs/pressureLevel" },
+            "businessRisk": { "$ref": "#/$defs/pressureLevel" },
+            "performanceCapacity": { "$ref": "#/$defs/pressureLevel" },
+            "technicalUncertainty": { "$ref": "#/$defs/pressureLevel" }
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["facts", "assumptions", "unknowns"],
+      "properties": {
+        "facts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidenceItem" }
+        },
+        "assumptions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidenceItem" }
+        },
+        "unknowns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidenceItem" }
+        }
+      }
+    },
+    "blocks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/block" }
+    }
+  },
+  "$defs": {
+    "pressureLevel": {
+      "enum": ["low", "medium", "high"]
+    },
+    "evidenceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "source": { "type": "string" },
+        "material": { "type": "boolean", "default": true }
+      }
+    },
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "importance", "reason", "representation", "content"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$"
+        },
+        "type": {
+          "enum": [
+            "summary",
+            "context",
+            "goals",
+            "change_set",
+            "architecture",
+            "flow",
+            "interfaces",
+            "data",
+            "decisions",
+            "non_functional",
+            "rollout",
+            "verification",
+            "risks"
+          ]
+        },
+        "title": { "type": "string" },
+        "importance": {
+          "enum": ["high", "medium", "low"]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Why this block is necessary. Low-value blocks should be removed before delivery."
+        },
+        "representation": {
+          "$ref": "#/$defs/representation"
+        },
+        "content": {
+          "description": "Structured block payload. Concrete block schemas will be added after V1 examples stabilize.",
+          "type": ["object", "array", "string"]
+        },
+        "sourceRefs": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "representation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "engine", "reason"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "text",
+            "table",
+            "cards",
+            "architecture",
+            "sequence",
+            "workflow",
+            "dataflow",
+            "lifecycle",
+            "er",
+            "gantt"
+          ]
+        },
+        "engine": {
+          "enum": ["native", "archify", "mermaid", "none"]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Why this representation is better than a simpler alternative."
+        },
+        "spec": {
+          "type": "object",
+          "description": "Engine-specific typed source. Avoid storing generated SVG/HTML here."
+        }
+      }
+    }
+  }
+}
