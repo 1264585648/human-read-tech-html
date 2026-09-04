@@ -1,27 +1,35 @@
 ---
 name: human-read-tech-html
-description: Design the minimum sufficient technical solution for a software change and produce a human-readable visual HTML artifact. Scope the ask before generating content, separate facts from assumptions, choose text/table/diagram representations by information value, and avoid ceremonial architecture, ADRs, or diagrams that do not help implementation or review.
+description: Design the minimum sufficient technical solution for a software change and produce a human-readable visual HTML artifact. Scope the ask before generating content, separate facts from assumptions, plan the reading narrative before rendering, choose text/table/diagram representations by information value, and avoid ceremonial architecture, ADRs, or details that do not help implementation or review.
 license: MIT
 ---
 
 # Human Read Tech HTML
 
-Generate a technical solution that is as small as possible while remaining unambiguous, reviewable, implementable, and safe to roll out.
+Generate a technical solution that is as small as possible while remaining unambiguous, reviewable, implementable, safe to roll out, and easy for a human to consume at multiple depths.
 
 Read only the references needed for the current stage:
 
 - `references/scoping-rules.md` before deciding depth;
+- `references/reading-rules.md` before composing the human reading order;
 - `references/representation-rules.md` before choosing text/table/diagram;
 - `references/review-rules.md` before handoff;
 - `adapters/archify.md` or `adapters/mermaid.md` only when that diagram engine is selected.
 
 The structured source contract is `schemas/solution.schema.json`.
 
-## Core law
+## Design laws
 
-**Do not maximize completeness. Maximize decision usefulness.**
+1. **Do not maximize completeness. Maximize decision usefulness.**
+2. **Bottom line before background.** State the proposed solution before long explanation.
+3. **Progressive disclosure over full exposure.** Support a 30-second scan, a 3-minute understanding pass, and an implementation-depth read.
+4. **Blocks are semantic units, not chapters.** Never expose the internal Block list as the table of contents by default.
+5. **Group by reader questions, not data types.** Prefer “方案怎么工作” over a flat “接口 / 数据 / 非功能” taxonomy.
+6. **Conclusion → reasons → evidence.** Do not force the reader to reconstruct the conclusion from raw facts.
+7. **One view, one main story.** A section, table, card group, or diagram should have one dominant purpose.
+8. **Complexity may increase depth, not first-read burden.** More complex systems may have more detail, but the first read stays bounded.
 
-Never add a section, diagram, table, alternative, metric, or infrastructure component merely because a template supports it.
+Never add a section, diagram, table, alternative, metric, infrastructure component, or paragraph merely because a template supports it.
 
 ## Workflow
 
@@ -64,19 +72,59 @@ Use Research Gate only when an unknown can change the design: new middleware/fra
 
 Keep research evidence concise in the final artifact.
 
-### 5. Select Blocks dynamically
+### 5. Select semantic Blocks dynamically
 
 Candidate block types:
 
 `summary`, `context`, `goals`, `change_set`, `architecture`, `flow`, `interfaces`, `data`, `decisions`, `non_functional`, `rollout`, `verification`, `risks`.
 
-Every included block must have `importance` and `reason`.
+Every included Block must have `importance` and `reason`.
 
-A block exists only when deleting it would create ambiguity, hide a material trade-off/risk, weaken rollout/verification, or lose important rationale.
+A Block exists only when deleting it would create ambiguity, hide a material trade-off/risk, weaken rollout/verification, or lose important rationale.
 
-### 6. Select the simplest representation
+**A Block is not a chapter.** It is an internal semantic unit that the Narrative Planner may group, nest, collapse, or move to the appendix.
 
-Apply `references/representation-rules.md`.
+### 6. Plan the human reading narrative
+
+Apply `references/reading-rules.md` before finalizing representation.
+
+Create a compact `brief` for the first screen:
+
+- `bottomLine`: the proposed solution in one concise statement;
+- `keyChanges`: normally 2–5 material changes;
+- optional `impact`: the most useful impact/boundary statement;
+- `keyRisks`: normally 0–3 material risks or constraints;
+- optional `delivery`: rollout/verification conclusion when it matters.
+
+For each Block assign reading metadata when useful:
+
+```json
+{
+  "reading": {
+    "role": "core | detail | reference",
+    "group": "overview | design | decisions | delivery | details | appendix"
+  }
+}
+```
+
+`importance` answers “does this matter technically?”; `reading.role` answers “when does the reader need to see it?”. They are deliberately different.
+
+Use these default first-level reading groups only when they contain material content:
+
+- `overview` → 先看结论
+- `design` → 方案怎么工作
+- `decisions` → 为什么这样设计
+- `delivery` → 如何安全上线
+- `details` → 实现细节
+- `appendix` → 依据与附录
+
+Keep first-level groups within the Reading Budget from `reading-rules.md`. Promote detail to `core` only when it is load-bearing for this specific change.
+
+The Narrative Planner may reorder/expose existing content, but must not invent technical facts or components.
+
+### 7. Select the simplest representation
+
+Apply `references/representation-rules.md` after reading depth is known.
 
 - simple fact/rationale → text
 - structured fields/risks/contracts → table
@@ -91,7 +139,9 @@ Apply `references/representation-rules.md`.
 
 A diagram is justified only when it communicates relationships or ordering materially better than text/table.
 
-### 7. Route diagrams deterministically
+Do not repeat a diagram’s topology edge-by-edge in prose. Use prose for rationale, boundary, exception, or consequence.
+
+### 8. Route diagrams deterministically
 
 Prefer Archify for architecture, sequence, workflow, dataflow and lifecycle.
 
@@ -99,17 +149,19 @@ Use Mermaid as a secondary fallback for ER, Gantt and other deliberately simple 
 
 The Skill decides whether and what to draw. The engine must not invent topology.
 
-### 8. Write `solution.json`
+### 9. Write `solution.json`
 
 `solution.json` is the source of truth.
 
-Store semantic content and typed diagram source, never generated SVG/HTML as authoritative data.
+Store semantic content, the compact first-read `brief`, reading metadata, and typed diagram source. Never store generated SVG/HTML as authoritative data.
 
-For Archify blocks, store the actual Archify Typed JSON Source in `representation.spec`.
+For Archify Blocks, store the actual Archify Typed JSON Source in `representation.spec`.
 
 Every Evidence item needs a unique stable `id`; every `sourceRefs` entry must resolve to one of those ids.
 
-### 9. Validate, review and simplify
+For new medium/high-pressure solutions, provide `brief` and explicit reading metadata rather than relying on renderer defaults.
+
+### 10. Validate, review and simplify
 
 When shell access is available:
 
@@ -118,11 +170,13 @@ node bin/hrth.mjs validate solution.json
 node bin/hrth.mjs review solution.json
 ```
 
-Validation checks structural requirements, all six scoping dimensions, evidence/reference integrity, representation routing, and supported Archify reference integrity.
+Validation checks structural requirements, all six scoping dimensions, Evidence/reference integrity, reading metadata, representation routing, and supported Archify reference integrity.
 
-Review adds deterministic completeness and anti-overdesign checks. Treat warnings as review prompts, not a reason to manufacture fixed chapters.
+Review checks completeness, anti-overdesign, evidence integrity, and readability. Readability warnings include excessive first-read burden, too many visible groups/core Blocks, missing narrative metadata on complex solutions, or reference/detail content exposed too early.
 
-If deterministic low-value blocks are found, simplify to a new file:
+Treat warnings as review prompts, not a reason to manufacture fixed chapters.
+
+If deterministic low-value Blocks are found, simplify to a new file:
 
 ```bash
 node bin/hrth.mjs simplify solution.json solution.simplified.json
@@ -130,7 +184,7 @@ node bin/hrth.mjs simplify solution.json solution.simplified.json
 
 Never overwrite the source without explicit user intent.
 
-### 10. Compile selected diagrams
+### 11. Compile selected diagrams
 
 Export sources:
 
@@ -138,13 +192,13 @@ Export sources:
 node bin/hrth.mjs diagrams solution.json .hrth/diagrams
 ```
 
-The exporter records a `sourceHash` in `manifest.json` and removes stale compiled HTML for exported Blocks before compilation.
+The exporter records a `sourceHash` in `manifest.json` and removes stale compiled HTML only when the source changes.
 
 When Archify is available, follow `adapters/archify.md`: validate and deliver each selected Archify source to `<block-id>.html` in that directory. A receipt with the matching `sourceHash` is recommended after successful validation/delivery.
 
 Do not claim Archify validation if the external deliver step did not run successfully.
 
-### 11. Render HTML
+### 12. Render HTML
 
 Without compiled diagrams:
 
@@ -158,16 +212,30 @@ With compiled diagram artifacts:
 node bin/hrth.mjs render solution.json solution.html --diagram-dir .hrth/diagrams
 ```
 
-Render only actual blocks. Navigation is dynamic. The first screen should answer why, what changes, design pressure and review state quickly.
+The renderer must compose Blocks into Reading Groups rather than flattening them into first-level chapters.
+
+Default exposure:
+
+- `core` → visible in the main reading flow;
+- `detail` → grouped under implementation details and collapsed by default where appropriate;
+- `reference` → appendix/reference area;
+- Evidence/assumptions/unknowns → appendix, never the main narrative.
+
+The first screen must lead with the bottom line and key changes, not internal metrics such as Block/diagram counts.
+
+Block `reason` is generator/reviewer metadata. Do not render it as a repeated reader-facing “为什么保留” paragraph.
 
 When a diagram manifest hash does not match the current `representation.spec`, or a supplied receipt is invalid, do not embed the artifact. Fall back honestly to the semantic representation and surface a review warning.
 
-### 12. Handoff discipline
+### 13. Handoff discipline
 
 Before delivery:
 
 - run review again;
 - ensure simple changes stayed simple;
+- ensure the BLUF actually states the selected solution rather than summarizing only background;
+- ensure a reviewer can understand why/what/how from the core reading groups without opening details;
+- ensure implementation detail is available without dominating the first read;
 - ensure every diagram and decision has a material reason;
 - ensure material Block conclusions can point to their evidence ids where needed;
 - state unresolved material unknowns honestly;
@@ -176,11 +244,11 @@ Before delivery:
 
 ## Regression anchors
 
-Use the three Golden Cases when changing scoping, routing, rendering, or review behavior:
+Use the three Golden Cases when changing scoping, narrative planning, routing, rendering, or review behavior:
 
-- `examples/01-simple-field`: low pressure, 0 diagrams;
-- `examples/02-redis-cache`: medium pressure, intentionally 0 diagrams;
-- `examples/03-kafka-async`: high pressure, exactly 2 justified Archify diagrams.
+- `examples/01-simple-field`: low pressure, 0 diagrams, first-level reading groups <= 3;
+- `examples/02-redis-cache`: medium pressure, intentionally 0 diagrams, first-level reading groups <= 5;
+- `examples/03-kafka-async`: high pressure, exactly 2 justified Archify diagrams, first-level reading groups <= 6 even though it has many semantic Blocks.
 
 Negative validation and stale-artifact regressions live in `tests/validation.mjs`.
 
