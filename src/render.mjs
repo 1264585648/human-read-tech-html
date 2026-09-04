@@ -227,7 +227,7 @@ export function renderSolutionHtml(solution, options = {}) {
 
   const setActiveNav = id => {
     navLinks.forEach(link => {
-      const active = link.getAttribute('href') === `#${id}`;
+      const active = link.getAttribute('href') === '#' + id;
       link.classList.toggle('is-active', active);
       if (active) link.setAttribute('aria-current', 'location');
       else link.removeAttribute('aria-current');
