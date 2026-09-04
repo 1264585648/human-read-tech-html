@@ -14,6 +14,13 @@ const REQUIRED_DIMENSIONS = [
   'changeScope','dataChange','callChain','businessRisk','performanceCapacity','technicalUncertainty'
 ];
 const ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
+const ROOT_KEYS = new Set(['schemaVersion','title','summary','meta','scoping','evidence','blocks']);
+const META_KEYS = new Set(['status','version','scope','confidence']);
+const SCOPING_KEYS = new Set(['fullDesignRequired','pressure','reasons','dimensions']);
+const EVIDENCE_KEYS = new Set(['facts','assumptions','unknowns']);
+const EVIDENCE_ITEM_KEYS = new Set(['id','text','source','material']);
+const BLOCK_KEYS = new Set(['id','type','title','importance','reason','representation','content','sourceRefs']);
+const REPRESENTATION_KEYS = new Set(['kind','engine','reason','spec']);
 
 export const BUDGETS = {
   low: { diagrams: 1, tables: 2, blocks: 6 },
@@ -31,6 +38,13 @@ function isObject(value) {
 
 function nonEmpty(value) {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function rejectUnknownKeys(value, allowed, code, errors, blockId = null) {
+  if (!isObject(value)) return;
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) errors.push(finding(code, 'error', `Unsupported property: ${key}.`, blockId));
+  }
 }
 
 function validateId(value, code, label, errors, blockId = null) {
@@ -102,25 +116,37 @@ export function validateSolution(solution) {
   const errors = [];
   const warnings = [];
   if (!isObject(solution)) return { ok: false, errors: [finding('root.type', 'error', 'Solution must be an object.')], warnings };
+  rejectUnknownKeys(solution, ROOT_KEYS, 'root.additional_property', errors);
   if (solution.schemaVersion !== '0.1') errors.push(finding('schema.version', 'error', 'schemaVersion must be "0.1".'));
   if (!nonEmpty(solution.title)) errors.push(finding('title.required', 'error', 'title is required.'));
+  if (solution.summary !== undefined && typeof solution.summary !== 'string') errors.push(finding('summary.type', 'error', 'summary must be a string.'));
+  if (solution.meta !== undefined) {
+    if (!isObject(solution.meta)) errors.push(finding('meta.type', 'error', 'meta must be an object.'));
+    else {
+      rejectUnknownKeys(solution.meta, META_KEYS, 'meta.additional_property', errors);
+      if (solution.meta.confidence !== undefined && !PRESSURE.has(solution.meta.confidence)) errors.push(finding('meta.confidence', 'error', 'meta.confidence must be high, medium, or low.'));
+    }
+  }
 
   const scoping = solution.scoping;
   if (!isObject(scoping)) {
     errors.push(finding('scoping.required', 'error', 'scoping is required.'));
   } else {
+    rejectUnknownKeys(scoping, SCOPING_KEYS, 'scoping.additional_property', errors);
     if (typeof scoping.fullDesignRequired !== 'boolean') errors.push(finding('scoping.fullDesignRequired', 'error', 'scoping.fullDesignRequired must be boolean.'));
     if (!PRESSURE.has(scoping.pressure)) errors.push(finding('scoping.pressure', 'error', 'scoping.pressure must be low, medium, or high.'));
     if (!Array.isArray(scoping.reasons) || scoping.reasons.length === 0) errors.push(finding('scoping.reasons', 'error', 'scoping.reasons must contain at least one reason.'));
+    else for (const reason of scoping.reasons) if (!nonEmpty(reason)) errors.push(finding('scoping.reasons.item', 'error', 'Every scoping reason must be non-empty.'));
     if (!isObject(scoping.dimensions)) {
       errors.push(finding('scoping.dimensions.required', 'error', 'All six scoping dimensions are required.'));
     } else {
+      rejectUnknownKeys(scoping.dimensions, new Set(REQUIRED_DIMENSIONS), 'scoping.dimension.unknown', errors);
       for (const key of REQUIRED_DIMENSIONS) {
         if (!PRESSURE.has(scoping.dimensions[key])) errors.push(finding('scoping.dimension.required', 'error', `Missing or invalid scoping dimension: ${key}.`));
       }
       for (const [key, level] of Object.entries(scoping.dimensions)) {
-        if (!REQUIRED_DIMENSIONS.includes(key)) warnings.push(finding('scoping.dimension.unknown', 'warning', `Unknown scoping dimension: ${key}.`));
-        else if (!PRESSURE.has(level)) errors.push(finding('scoping.dimension', 'error', `Invalid pressure level for ${key}.`));
+        if (!REQUIRED_DIMENSIONS.includes(key)) continue;
+        if (!PRESSURE.has(level)) errors.push(finding('scoping.dimension', 'error', `Invalid pressure level for ${key}.`));
       }
     }
   }
@@ -130,6 +156,7 @@ export function validateSolution(solution) {
   if (!isObject(evidence)) {
     errors.push(finding('evidence.required', 'error', 'evidence is required.'));
   } else {
+    rejectUnknownKeys(evidence, EVIDENCE_KEYS, 'evidence.additional_property', errors);
     for (const key of ['facts','assumptions','unknowns']) {
       if (!Array.isArray(evidence[key])) {
         errors.push(finding(`evidence.${key}`, 'error', `evidence.${key} must be an array.`));
@@ -140,6 +167,9 @@ export function validateSolution(solution) {
           errors.push(finding(`evidence.${key}.item`, 'error', `Every ${key} item must contain non-empty text.`));
           continue;
         }
+        rejectUnknownKeys(item, EVIDENCE_ITEM_KEYS, `evidence.${key}.additional_property`, errors);
+        if (item.source !== undefined && typeof item.source !== 'string') errors.push(finding(`evidence.${key}.source`, 'error', 'Evidence source must be a string.'));
+        if (item.material !== undefined && typeof item.material !== 'boolean') errors.push(finding(`evidence.${key}.material`, 'error', 'Evidence material must be boolean.'));
         if (validateId(item.id, `evidence.${key}.id`, `Every ${key} item id`, errors)) {
           if (evidenceIds.has(item.id)) errors.push(finding('evidence.id.duplicate', 'error', `Duplicate evidence id: ${item.id}.`));
           evidenceIds.add(item.id);
@@ -156,8 +186,10 @@ export function validateSolution(solution) {
   const seen = new Set();
   for (const block of solution.blocks) {
     if (!isObject(block)) { errors.push(finding('block.type', 'error', 'Every block must be an object.')); continue; }
+    rejectUnknownKeys(block, BLOCK_KEYS, 'block.additional_property', errors, block.id);
     if (validateId(block.id, 'block.id', 'Block id', errors, block.id) && seen.has(block.id)) errors.push(finding('block.id.duplicate', 'error', `Duplicate block id: ${block.id}`, block.id));
     else if (nonEmpty(block.id)) seen.add(block.id);
+    if (block.title !== undefined && typeof block.title !== 'string') errors.push(finding('block.title', 'error', 'Block title must be a string.', block.id));
     if (!BLOCK_TYPES.has(block.type)) errors.push(finding('block.type.invalid', 'error', `Invalid block type: ${block.type}`, block.id));
     if (!PRESSURE.has(block.importance)) errors.push(finding('block.importance', 'error', 'Block importance must be low, medium, or high.', block.id));
     if (!nonEmpty(block.reason)) errors.push(finding('block.reason', 'error', 'Every block must explain why it exists.', block.id));
@@ -165,13 +197,19 @@ export function validateSolution(solution) {
 
     if (block.sourceRefs !== undefined) {
       if (!Array.isArray(block.sourceRefs)) errors.push(finding('block.source_refs.type', 'error', 'sourceRefs must be an array.', block.id));
-      else for (const ref of block.sourceRefs) {
-        if (!nonEmpty(ref) || !evidenceIds.has(ref)) errors.push(finding('block.source_ref.invalid', 'error', `Unknown evidence reference: ${ref}`, block.id));
+      else {
+        const refs = new Set();
+        for (const ref of block.sourceRefs) {
+          if (refs.has(ref)) errors.push(finding('block.source_ref.duplicate', 'error', `Duplicate evidence reference: ${ref}`, block.id));
+          refs.add(ref);
+          if (!nonEmpty(ref) || !evidenceIds.has(ref)) errors.push(finding('block.source_ref.invalid', 'error', `Unknown evidence reference: ${ref}`, block.id));
+        }
       }
     }
 
     const rep = block.representation;
     if (!isObject(rep)) { errors.push(finding('representation.required', 'error', 'representation is required.', block.id)); continue; }
+    rejectUnknownKeys(rep, REPRESENTATION_KEYS, 'representation.additional_property', errors, block.id);
     if (!REPRESENTATIONS.has(rep.kind)) errors.push(finding('representation.kind', 'error', `Unsupported representation kind: ${rep.kind}`, block.id));
     if (!ENGINES.has(rep.engine)) errors.push(finding('representation.engine', 'error', `Unsupported engine: ${rep.engine}`, block.id));
     if (!nonEmpty(rep.reason)) errors.push(finding('representation.reason', 'error', 'Every representation must explain why it is better than a simpler alternative.', block.id));
