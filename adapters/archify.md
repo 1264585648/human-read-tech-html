@@ -35,7 +35,7 @@ node bin/hrth.mjs diagrams solution.json .hrth/diagrams
 
 The exporter writes each typed source plus `manifest.json`. Every diagram entry contains a SHA-256 `sourceHash` derived from the current `representation.spec`.
 
-Exporting a diagram also removes any existing `<block-id>.html` and `<block-id>.receipt.json` for that block. This prevents a previously compiled artifact from silently surviving a source change.
+When a Block's `sourceHash` changes, exporting that diagram removes the previous `<block-id>.html` and `<block-id>.receipt.json`. If the hash is unchanged, the valid compiled artifact is preserved for incremental builds.
 
 A calling Agent with Archify installed should:
 
