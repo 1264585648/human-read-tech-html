@@ -4,7 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { validateSolution, reviewSolution } from '../src/core.mjs';
+import { validateSolution, reviewSolution, planReading, countBriefPoints } from '../src/core.mjs';
 import { renderSolutionHtml } from '../src/render.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -81,6 +81,22 @@ const kafka = readCase('03-kafka-async');
 }
 
 {
+  const bad = clone(simple);
+  bad.blocks[0].reading = { role: 'everything', group: 'overview' };
+  const result = validateSolution(bad);
+  assert.equal(result.ok, false);
+  assert.ok(hasCode(result.errors, 'reading.role'));
+}
+
+{
+  const bad = clone(simple);
+  bad.brief = { bottomLine: '改造', keyChanges: [], keyRisks: [] };
+  const result = validateSolution(bad);
+  assert.equal(result.ok, false);
+  assert.ok(hasCode(result.errors, 'brief.key_changes.length'));
+}
+
+{
   const bad = clone(kafka);
   const architecture = bad.blocks.find(block => block.id === 'architecture');
   architecture.representation.spec.connections[0].to = 'missing-component';
@@ -113,6 +129,50 @@ const kafka = readCase('03-kafka-async');
 }
 
 {
+  const result = reviewSolution(kafka);
+  assert.ok(hasCode(result.warnings, 'readability.brief.missing'));
+  assert.ok(hasCode(result.warnings, 'readability.metadata.missing'));
+  assert.equal(result.reading.groups, 5);
+  assert.equal(result.reading.coreBlocks, 8);
+}
+
+{
+  const narrative = clone(kafka);
+  narrative.brief = {
+    bottomLine: '订单主事务只负责落库与可靠发布事件，积分和通知迁出同步请求并由 Kafka 异步处理。',
+    keyChanges: [
+      '订单与 Outbox 同事务提交，避免数据库成功但事件丢失。',
+      '积分与通知改为至少一次消费，并通过 eventId 做业务幂等。',
+      '消费失败按策略重试，超限进入 DLQ。'
+    ],
+    impact: '支付链路不变；订单接口成功语义仍以订单主事务提交为准。',
+    keyRisks: ['Kafka 容量需在上线前核实。', '灰度期间必须避免同步与异步双执行。'],
+    delivery: '影子发布 → 小流量异步 → 全量，保留同步实现开关用于回退。'
+  };
+  narrative.blocks = planReading(narrative).blocks;
+
+  const validation = validateSolution(narrative);
+  assert.equal(validation.ok, true, JSON.stringify(validation.errors));
+  const review = reviewSolution(narrative);
+  assert.ok(!hasCode(review.warnings, 'readability.brief.missing'));
+  assert.ok(!hasCode(review.warnings, 'readability.metadata.missing'));
+  assert.equal(countBriefPoints(narrative.brief), 8);
+  assert.equal(review.reading.groups, 5);
+  assert.equal(review.reading.coreBlocks, 8);
+
+  const html = renderSolutionHtml(narrative);
+  assert.ok(html.includes('方案结论'));
+  assert.ok(html.includes('核心变化'));
+  assert.ok(html.includes('group-overview'));
+  assert.ok(html.includes('group-design'));
+  assert.ok(html.includes('group-details'));
+  assert.ok(html.includes('class="reading-group reading-group-collapsed"'));
+  assert.ok(html.includes('依据与附录'));
+  assert.ok(!html.includes('为什么保留：'));
+  assert.ok(!html.includes('内容块</span>'));
+}
+
+{
   const html = renderSolutionHtml(simple);
   assert.ok(html.includes('class="source-ref"'));
   assert.ok(html.includes('本次只增加订单查询响应字段。'));
@@ -124,12 +184,17 @@ const kafka = readCase('03-kafka-async');
   assert.ok(html.includes("setAttribute('aria-current', 'location')"));
   assert.ok(html.includes('class="importance-high"'));
   assert.ok(html.includes('class="importance medium">medium</span>'));
-  assert.ok(html.includes('class="section section-reading"'));
+  assert.ok(html.includes('class="content-block"'));
+  assert.ok(html.includes('group-overview'));
+  assert.ok(html.includes('group-delivery'));
+  assert.ok(html.includes('group-details'));
 }
 
 {
   const html = renderSolutionHtml(kafka);
-  assert.ok(html.includes('class="section section-emphasis"'));
+  assert.ok(html.includes('class="content-block content-block-emphasis"'));
+  assert.ok(html.includes('方案怎么工作'));
+  assert.ok(html.includes('为什么这样设计'));
 }
 
 {
@@ -155,4 +220,4 @@ const kafka = readCase('03-kafka-async');
   assert.ok(html.includes('.embedded-diagram:fullscreen'));
 }
 
-console.log(JSON.stringify({ ok: true, negativeCases: 13, uiCases: 3 }, null, 2));
+console.log(JSON.stringify({ ok: true, negativeCases: 15, narrativeCases: 3, uiCases: 3 }, null, 2));
