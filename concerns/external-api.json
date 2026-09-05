@@ -1,0 +1,14 @@
+{
+  "id": "external-api",
+  "title": "外部 API / 第三方依赖",
+  "questions": [
+    { "id": "contract", "question": "请求、响应、错误码和兼容性契约是否明确且可核验？" },
+    { "id": "timeout", "question": "连接、请求和整体超时边界是什么？" },
+    { "id": "retry", "question": "哪些错误允许重试，退避、上限和幂等条件是什么？" },
+    { "id": "rate-limit", "question": "限流、配额和突发流量边界是什么？" },
+    { "id": "degradation", "question": "第三方不可用时业务如何降级、缓存、排队或失败？" },
+    { "id": "security", "question": "认证凭据、敏感数据、签名与密钥轮换如何处理？" },
+    { "id": "versioning", "question": "对方版本升级或字段变化时如何发现并兼容？" },
+    { "id": "observability", "question": "如何观察成功率、延迟、错误分布和依赖健康度？" }
+  ]
+}
