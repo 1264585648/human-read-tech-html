@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://human-read-tech-html.local/schemas/solution.v2.schema.json",
+  "title": "Human Read Tech HTML V2 Layered Solution",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "title", "scoping", "evidence", "concerns", "model", "view"],
+  "properties": {
+    "schemaVersion": { "const": "0.2" },
+    "title": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string" },
+    "meta": { "$ref": "#/$defs/meta" },
+    "scoping": { "$ref": "#/$defs/scoping" },
+    "evidence": { "$ref": "#/$defs/evidence" },
+    "concerns": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/concern" }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blocks"],
+      "properties": {
+        "blocks": { "type": "array", "items": { "$ref": "#/$defs/modelBlock" } }
+      }
+    },
+    "view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["brief", "groups"],
+      "properties": {
+        "brief": { "$ref": "#/$defs/brief" },
+        "groups": { "type": "array", "items": { "$ref": "#/$defs/viewGroup" } }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "pressure": { "enum": ["low", "medium", "high"] },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string" },
+        "version": { "type": "string" },
+        "scope": { "type": "string" },
+        "confidence": { "$ref": "#/$defs/pressure" }
+      }
+    },
+    "scoping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fullDesignRequired", "pressure", "reasons", "dimensions"],
+      "properties": {
+        "fullDesignRequired": { "type": "boolean" },
+        "pressure": { "$ref": "#/$defs/pressure" },
+        "reasons": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["changeScope", "dataChange", "callChain", "businessRisk", "performanceCapacity", "technicalUncertainty"],
+          "properties": {
+            "changeScope": { "$ref": "#/$defs/pressure" },
+            "dataChange": { "$ref": "#/$defs/pressure" },
+            "callChain": { "$ref": "#/$defs/pressure" },
+            "businessRisk": { "$ref": "#/$defs/pressure" },
+            "performanceCapacity": { "$ref": "#/$defs/pressure" },
+            "technicalUncertainty": { "$ref": "#/$defs/pressure" }
+          }
+        }
+      }
+    },
+    "evidenceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "text": { "type": "string", "minLength": 1 },
+        "source": { "type": "string" },
+        "material": { "type": "boolean" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["facts", "assumptions", "unknowns"],
+      "properties": {
+        "facts": { "type": "array", "items": { "$ref": "#/$defs/evidenceItem" } },
+        "assumptions": { "type": "array", "items": { "$ref": "#/$defs/evidenceItem" } },
+        "unknowns": { "type": "array", "items": { "$ref": "#/$defs/evidenceItem" } }
+      }
+    },
+    "brief": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bottomLine", "keyChanges", "keyRisks"],
+      "properties": {
+        "bottomLine": { "type": "string", "minLength": 1 },
+        "keyChanges": { "type": "array", "minItems": 1, "maxItems": 5, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "impact": { "type": "string", "minLength": 1 },
+        "keyRisks": { "type": "array", "maxItems": 3, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "delivery": { "type": "string", "minLength": 1 }
+      }
+    },
+    "modelBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "importance", "reason", "content"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "enum": ["summary", "context", "goals", "change_set", "architecture", "flow", "interfaces", "data", "decisions", "non_functional", "rollout", "verification", "risks"] },
+        "title": { "type": "string" },
+        "importance": { "$ref": "#/$defs/pressure" },
+        "reason": { "type": "string", "minLength": 1 },
+        "content": { "type": ["object", "array", "string"] },
+        "sourceRefs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+      }
+    },
+    "presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "reason"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string" },
+        "kind": { "enum": ["text", "table", "cards", "architecture", "sequence", "workflow", "dataflow", "lifecycle", "er", "gantt"] },
+        "engine": { "enum": ["native", "archify", "mermaid", "none"] },
+        "reason": { "type": "string", "minLength": 1 },
+        "content": { "type": ["object", "array", "string"] },
+        "spec": { "type": "object" }
+      }
+    },
+    "viewItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blockRef", "presentations"],
+      "properties": {
+        "blockRef": { "$ref": "#/$defs/id" },
+        "presentations": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/presentation" } }
+      }
+    },
+    "viewGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "layer", "slot", "items"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string", "minLength": 1 },
+        "layer": { "enum": ["understand", "implement", "reference"] },
+        "slot": { "enum": ["overview", "design", "decisions", "delivery", "details", "appendix"] },
+        "items": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/viewItem" } }
+      }
+    },
+    "concernAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["answered", "unknown", "not_applicable"] },
+        "blockRefs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "evidenceRefs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "note": { "type": "string" }
+      }
+    },
+    "concern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "answers"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "answers": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/concernAnswer" }
+        }
+      }
+    }
+  }
+}
