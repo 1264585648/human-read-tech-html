@@ -1,0 +1,14 @@
+{
+  "id": "async-messaging",
+  "title": "异步消息与事件驱动",
+  "questions": [
+    { "id": "delivery-semantics", "question": "消息投递语义是什么，是否明确 at-most-once / at-least-once / effectively-once？" },
+    { "id": "idempotency", "question": "重复投递时，业务幂等在哪里实现，幂等键和保留窗口是什么？" },
+    { "id": "ordering", "question": "是否依赖顺序，顺序保证的粒度和分区键是什么？" },
+    { "id": "ack-boundary", "question": "什么时候确认消费进度，失败发生在哪个边界会触发重投？" },
+    { "id": "retry-dlq", "question": "重试、退避、最大次数、DLQ 和人工重放策略是什么？" },
+    { "id": "failure-isolation", "question": "消息系统或消费者故障时，主链路如何隔离和降级？" },
+    { "id": "observability", "question": "如何观察发布延迟、积压、重试、DLQ 与处理耗时？" },
+    { "id": "capacity", "question": "峰值吞吐、分区、保留策略和容量边界是否已验证？" }
+  ]
+}

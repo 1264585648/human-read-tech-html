@@ -1,0 +1,14 @@
+{
+  "id": "data-migration",
+  "title": "数据迁移与 Schema 演进",
+  "questions": [
+    { "id": "compatibility", "question": "新旧应用版本和新旧 Schema 是否可以在发布窗口内共存？" },
+    { "id": "expand-contract", "question": "是否采用 expand → migrate → contract，何时允许删除旧字段或旧路径？" },
+    { "id": "backfill", "question": "历史数据如何回填，批次、限速、失败重试和断点续跑策略是什么？" },
+    { "id": "dual-write", "question": "迁移期间是否双写，双写失败和数据漂移如何处理？" },
+    { "id": "cutover", "question": "读写切换的条件、顺序和可观察信号是什么？" },
+    { "id": "verification", "question": "如何验证数量、校验和、业务抽样或关键不变量？" },
+    { "id": "rollback", "question": "切换后如何回滚，哪些数据变化不可逆？" },
+    { "id": "capacity", "question": "迁移对数据库负载、锁、复制延迟和存储容量的影响是什么？" }
+  ]
+}

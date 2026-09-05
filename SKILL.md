@@ -1,167 +1,314 @@
 ---
 name: human-read-tech-html
-description: Design the minimum sufficient technical solution for a software change and produce a human-readable visual HTML artifact. Scope the ask before generating content, separate facts from assumptions, plan the reading narrative before rendering, choose text/table/diagram representations by information value, and avoid ceremonial architecture, ADRs, or details that do not help implementation or review.
+description: Build an evidence-backed, minimum-sufficient technical solution, detect the engineering concerns that must be answered, separate the semantic solution model from the human reading view, and compile the result into a progressive-disclosure HTML artifact. Prefer V2 schema 0.2 for new medium/high designs while preserving V1 compatibility.
 license: MIT
 ---
 
 # Human Read Tech HTML
 
-Generate a technical solution that is as small as possible while remaining unambiguous, reviewable, implementable, safe to roll out, and easy for a human to consume at multiple depths.
+Create technical solutions that may be deep for engineers but remain bounded and coherent for first-time readers.
+
+The default V2 mental model is a compiler pipeline, not a fixed document template:
+
+```text
+Understand
+  ↓
+Detect Concerns
+  ↓
+Design
+  ↓
+Decide
+  ↓
+Plan Narrative
+  ↓
+Choose Presentations
+  ↓
+Compile Document AST
+  ↓
+Render / Review
+```
 
 Read only the references needed for the current stage:
 
-- `references/scoping-rules.md` before deciding depth;
-- `references/reading-rules.md` before composing the human reading order;
-- `references/representation-rules.md` before choosing text/table/diagram;
+- `references/scoping-rules.md` before deciding design depth;
+- `references/concern-rules.md` before activating engineering question packs;
+- `references/reading-rules.md` for human reading principles;
+- `references/representation-rules.md` before choosing text/table/cards/diagram;
 - `references/review-rules.md` before handoff;
-- `adapters/archify.md` or `adapters/mermaid.md` only when that diagram engine is selected.
+- `docs/v2-design.md` when creating or modifying schemaVersion `0.2` artifacts;
+- diagram adapters only when that engine is selected.
 
-The structured source contract is `schemas/solution.schema.json`.
+Use `schemas/solution.v2.schema.json` for new V2 artifacts. `schemas/solution.schema.json` remains the V1 compatibility contract.
 
 ## Design laws
 
 1. **Do not maximize completeness. Maximize decision usefulness.**
-2. **Bottom line before background.** State the proposed solution before long explanation.
-3. **Progressive disclosure over full exposure.** Support a 30-second scan, a 3-minute understanding pass, and an implementation-depth read.
-4. **Blocks are semantic units, not chapters.** Never expose the internal Block list as the table of contents by default.
-5. **Group by reader questions, not data types.** Prefer “方案怎么工作” over a flat “接口 / 数据 / 非功能” taxonomy.
-6. **Conclusion → reasons → evidence.** Do not force the reader to reconstruct the conclusion from raw facts.
-7. **One view, one main story.** A section, table, card group, or diagram should have one dominant purpose.
-8. **Complexity may increase depth, not first-read burden.** More complex systems may have more detail, but the first read stays bounded.
+2. **Technical depth and first-read burden are separate budgets.** A complex system may need deep implementation material without exposing all of it at once.
+3. **Problem before solution.** Do not silently convert a requested technology into the actual goal.
+4. **Concern before chapter.** Detect the engineering questions that matter; never create sections merely because a template contains them.
+5. **Model before View.** Technical truth must not depend on how the current reader sees it.
+6. **Bottom line before background.** State the selected solution before long explanation.
+7. **Conclusion → reasons → evidence.** Do not make the reader reconstruct the answer from raw facts.
+8. **One semantic block may have multiple presentations.** A diagram can explain topology while text explains the load-bearing boundary or consequence.
+9. **Progressive disclosure over full exposure.** Support Scan, Understand, Implement and Reference depths.
+10. **One view, one main story.** Diagrams, tables, cards and sections each need one dominant purpose.
+11. **Unknown is a valid engineering state.** Never manufacture certainty to make review green.
 
-Never add a section, diagram, table, alternative, metric, infrastructure component, or paragraph merely because a template supports it.
+# V2 workflow
 
-## Workflow
+## 1. Understand the problem
 
-### 1. Parse evidence
+Extract only supported information from the request, files, repository and verified external sources:
 
-Extract only supported information from the request, files, repository, or verified external sources:
+- facts;
+- assumptions;
+- unknowns;
+- actual problem / motivation;
+- goals and non-goals;
+- constraints;
+- affected systems and actors;
+- data/interface/state changes;
+- rollout constraints.
 
-- facts
-- assumptions
-- unknowns
-- goals / non-goals
-- constraints
-- affected components
-- data/interface/state changes
-- rollout constraints
+Do not accept implementation wording as the goal without checking the underlying problem.
 
-Every evidence item must have a stable lowercase `id`. When a Block materially depends on specific evidence, connect it with `sourceRefs` rather than repeating or silently promoting the evidence.
+Example:
 
-Never silently promote an assumption or unknown to fact.
+```text
+User wording: "把同步后处理改成 Kafka"
+Problem: synchronous post-processing expands latency/failure coupling
+Candidate mechanism: Kafka async boundary
+```
 
-### 2. Scope before designing
+Every Evidence item needs a stable lowercase id. A material conclusion should be traceable through `sourceRefs` when specific evidence constrains it.
 
-Apply `references/scoping-rules.md`.
+Never silently promote an assumption or unknown to a fact.
 
-Assess all six pressure dimensions: change scope, data change, call chain, business risk, performance/capacity, technical uncertainty. Do not omit a dimension because it appears irrelevant; mark it `low` instead.
+## 2. Scope before designing
 
-If the anti-overdesign gate closes the full-design path, keep the solution minimal. A full report is not mandatory.
+Apply all six pressure dimensions from `references/scoping-rules.md`:
 
-### 3. Build the simplest production-viable design first
+- change scope;
+- data change;
+- call chain;
+- business risk;
+- performance/capacity;
+- technical uncertainty.
 
-Start from the smallest design that meets the stated goal and constraints.
+Use the anti-overdesign gate before creating a deep design.
 
-Do not create alternatives by default. An alternative must remain genuinely viable and differ on a load-bearing axis such as correctness, capacity, fault isolation, latency, cost, operational complexity, or delivery risk.
+Content Budget is a ceiling, never a quota.
 
-Three alternatives is a ceiling, not a target.
+A small change may remain V1-compatible and simple. New medium/high designs should normally use schemaVersion `0.2` so Model and View stay separated.
 
-### 4. Research only material unknowns
+## 3. Detect engineering Concerns
 
-Use Research Gate only when an unknown can change the design: new middleware/framework/protocol, version/API limit, transaction/failure semantics, external service contract, or explicitly requested verification.
+Apply `references/concern-rules.md`.
 
-Keep research evidence concise in the final artifact.
+Concern Packs are question sets, not document sections.
 
-### 5. Select semantic Blocks dynamically
+Built-in packs currently include:
 
-Candidate block types:
+- `async-messaging`;
+- `cache`;
+- `data-migration`;
+- `external-api`.
+
+Activate only material packs.
+
+For every activated question set one state:
+
+- `answered`;
+- `unknown`;
+- `not_applicable`.
+
+An answered concern should normally point to one or more semantic `blockRefs` and/or `evidenceRefs`.
+
+Do not expose a Concern Pack as a first-level chapter merely because it was activated.
+
+## 4. Build the Solution Model
+
+The V2 `model.blocks[]` layer contains technical semantics only.
+
+Candidate semantic block types remain deliberately small:
 
 `summary`, `context`, `goals`, `change_set`, `architecture`, `flow`, `interfaces`, `data`, `decisions`, `non_functional`, `rollout`, `verification`, `risks`.
 
-Every included Block must have `importance` and `reason`.
+A Block exists only when removing it would:
 
-A Block exists only when deleting it would create ambiguity, hide a material trade-off/risk, weaken rollout/verification, or lose important rationale.
+- create implementation ambiguity;
+- hide a material trade-off/risk;
+- weaken rollout, rollback or verification;
+- lose rationale future maintainers need.
 
-**A Block is not a chapter.** It is an internal semantic unit that the Narrative Planner may group, nest, collapse, or move to the appendix.
+Every Block must include:
 
-### 6. Plan the human reading narrative
+- stable `id`;
+- semantic `type`;
+- `importance`;
+- generator/reviewer `reason`;
+- semantic `content`;
+- `sourceRefs` when needed.
 
-Apply `references/reading-rules.md` before finalizing representation.
+### V2 separation rule
 
-Create a compact `brief` for the first screen:
+Never put either of these inside a V2 Model Block:
 
-- `bottomLine`: the proposed solution in one concise statement;
-- `keyChanges`: normally 2–5 material changes;
-- optional `impact`: the most useful impact/boundary statement;
-- `keyRisks`: normally 0–3 material risks or constraints;
-- optional `delivery`: rollout/verification conclusion when it matters.
-
-For each Block assign reading metadata when useful:
-
-```json
-{
-  "reading": {
-    "role": "core | detail | reference",
-    "group": "overview | design | decisions | delivery | details | appendix"
-  }
-}
+```text
+reading
+representation
 ```
 
-`importance` answers “does this matter technically?”; `reading.role` answers “when does the reader need to see it?”. They are deliberately different.
+The Model answers **what is technically true / selected**.
 
-Use these default first-level reading groups only when they contain material content:
+The View later answers **when and how a reader sees it**.
 
-- `overview` → 先看结论
-- `design` → 方案怎么工作
-- `decisions` → 为什么这样设计
-- `delivery` → 如何安全上线
-- `details` → 实现细节
-- `appendix` → 依据与附录
+## 5. Record real Decisions
 
-Keep first-level groups within the Reading Budget from `reading-rules.md`. Promote detail to `core` only when it is load-bearing for this specific change.
+Create a Decision semantic block only when two or more live alternatives differ on a load-bearing axis such as:
 
-The Narrative Planner may reorder/expose existing content, but must not invent technical facts or components.
+- correctness;
+- failure isolation;
+- capacity/latency;
+- cost;
+- operational complexity;
+- delivery risk.
 
-### 7. Select the simplest representation
+Prefer the light MADR meaning:
 
-Apply `references/representation-rules.md` after reading depth is known.
+```text
+Question / Context
+→ Drivers
+→ Options
+→ Selected
+→ Rationale
+→ Consequences
+```
 
-- simple fact/rationale → text
-- structured fields/risks/contracts → table
-- a few parallel conclusions → cards
-- components/boundaries → architecture
-- ordered cross-participant calls → sequence
-- branches/process/runbook → workflow
-- source/transform/store/consumer → dataflow
-- states/retries/terminal paths → lifecycle
-- entity relationships → ER
-- meaningful time dependencies → Gantt
+Do not manufacture three alternatives because a template allows three.
 
-A diagram is justified only when it communicates relationships or ordering materially better than text/table.
+## 6. Plan the human View
 
-Do not repeat a diagram’s topology edge-by-edge in prose. Use prose for rationale, boundary, exception, or consequence.
+The V2 `view` is a separate artifact layer over the Solution Model.
 
-### 8. Route diagrams deterministically
+### Scan
 
-Prefer Archify for architecture, sequence, workflow, dataflow and lifecycle.
+`view.brief` is the 30-second layer:
 
-Use Mermaid as a secondary fallback for ER, Gantt and other deliberately simple secondary diagrams.
+- `bottomLine`;
+- 2–5 `keyChanges`;
+- optional `impact`;
+- 0–3 `keyRisks`;
+- optional `delivery`.
 
-The Skill decides whether and what to draw. The engine must not invent topology.
+It is a navigation summary, not a duplicate report.
 
-### 9. Write `solution.json`
+### Understand
 
-`solution.json` is the source of truth.
+Use `layer: "understand"` for the 3–5 minute main reading path.
 
-Store semantic content, the compact first-read `brief`, reading metadata, and typed diagram source. Never store generated SVG/HTML as authoritative data.
+Prefer reader-question titles such as:
 
-For Archify Blocks, store the actual Archify Typed JSON Source in `representation.spec`.
+- 这次到底改变了什么
+- 新方案怎么工作
+- 为什么这样设计
+- 哪些边界最重要
+- 怎么安全上线并证明可恢复
 
-Every Evidence item needs a unique stable `id`; every `sourceRefs` entry must resolve to one of those ids.
+Do not mechanically expose internal taxonomy such as interface/data/non-functional as first-level reading order.
 
-For new medium/high-pressure solutions, provide `brief` and explicit reading metadata rather than relying on renderer defaults.
+### Implement
 
-### 10. Validate, review and simplify
+Use `layer: "implement"` for details needed during implementation or deep review:
+
+- exhaustive interfaces;
+- data fields;
+- config;
+- timeout/retry parameters;
+- operational thresholds;
+- test matrices;
+- migration details.
+
+This material may be heavy. It simply should not dominate the first read.
+
+### Reference
+
+Use `layer: "reference"` for evidence, assumptions, research sources and exhaustive lookup material.
+
+## 7. Use narrative slots as a bounded compatibility vocabulary
+
+Current V2 View Groups map into six stable narrative slots:
+
+- `overview`
+- `design`
+- `decisions`
+- `delivery`
+- `details`
+- `appendix`
+
+The reader-facing `title` may be question-oriented and specific to the solution.
+
+The slot is a compiler/layout boundary, not a command to generate six sections. Empty slots do not appear.
+
+## 8. Choose Presentations after the View is known
+
+Each View Item references one semantic Block and declares one or more Presentation Nodes.
+
+Available presentation kinds currently include:
+
+- text;
+- table;
+- cards;
+- architecture;
+- sequence;
+- workflow;
+- dataflow;
+- lifecycle;
+- er;
+- gantt.
+
+Choose the simplest representation that materially improves comprehension at that reading layer.
+
+### Multiple presentations are allowed
+
+Example:
+
+```text
+architecture semantic block
+  ├─ architecture diagram: shows components and boundaries
+  └─ text: states the one failure-isolation conclusion the reader must remember
+```
+
+This is preferred over either:
+
+- forcing all rationale into diagram labels; or
+- repeating the complete diagram edge-by-edge in prose.
+
+### Diagram gate
+
+Generate a diagram only when relationship, ordering, branch, boundary, state or data movement is materially clearer than prose/table.
+
+If 3–5 sentences or a compact table is equally clear, do not draw.
+
+Prefer Archify for architecture/sequence/workflow/dataflow/lifecycle and Mermaid for ER/Gantt fallback.
+
+## 9. Compile to Document AST
+
+For schemaVersion `0.2`, `compileDocumentAst()` creates the stable boundary between semantic Model and rendering.
+
+A Presentation Node carries:
+
+- semantic `blockRef`;
+- reading `layer` and narrative `slot`;
+- presentation kind/engine;
+- content/spec;
+- Evidence refs.
+
+The same semantic Block can therefore be reused by multiple presentation nodes without duplicating technical truth in the Model.
+
+V2 currently compiles the AST to the stable V1 runtime representation so existing validation, diagram freshness and HTML renderer behavior are preserved during migration.
+
+## 10. Validate and review
 
 When shell access is available:
 
@@ -170,86 +317,110 @@ node bin/hrth.mjs validate solution.json
 node bin/hrth.mjs review solution.json
 ```
 
-Validation checks structural requirements, all six scoping dimensions, Evidence/reference integrity, reading metadata, representation routing, and supported Archify reference integrity.
+The CLI auto-detects schemaVersion `0.1` or `0.2`.
 
-Review checks completeness, anti-overdesign, evidence integrity, and readability. Readability warnings include excessive first-read burden, too many visible groups/core Blocks, missing narrative metadata on complex solutions, or reference/detail content exposed too early.
+V2 Review must consider both:
 
-Treat warnings as review prompts, not a reason to manufacture fixed chapters.
+### Deterministic structure
 
-If deterministic low-value Blocks are found, simplify to a new file:
+- Model/View separation;
+- block refs;
+- presentation specs;
+- Evidence refs;
+- Concern Pack ids and answer states;
+- compiled V1 runtime validity;
+- existing diagram routing/freshness rules.
 
-```bash
-node bin/hrth.mjs simplify solution.json solution.simplified.json
-```
+### Human/semantic review
 
-Never overwrite the source without explicit user intent.
+- did we solve the actual problem rather than obey a requested technology blindly;
+- are all material Concern questions answered or honestly unknown;
+- can a reviewer understand the selected solution without opening implementation details;
+- is a diagram carrying relationships while prose carries rationale/boundary/consequence;
+- is repeated exposition actually adding meaning;
+- are implementation details promoted to the main path only when load-bearing.
 
-### 11. Compile selected diagrams
+Warnings are review prompts, not a reason to manufacture sections.
 
-Export sources:
+## 11. Compile diagrams
 
 ```bash
 node bin/hrth.mjs diagrams solution.json .hrth/diagrams
 ```
 
-The exporter records a `sourceHash` in `manifest.json` and removes stale compiled HTML only when the source changes.
+For V2, diagram ids are Presentation Node ids rather than semantic Block ids when a Block has multiple presentations.
 
-When Archify is available, follow `adapters/archify.md`: validate and deliver each selected Archify source to `<block-id>.html` in that directory. A receipt with the matching `sourceHash` is recommended after successful validation/delivery.
+Keep the existing source-hash and receipt discipline. Do not embed stale or unverifiable diagram artifacts.
 
-Do not claim Archify validation if the external deliver step did not run successfully.
-
-### 12. Render HTML
-
-Without compiled diagrams:
+## 12. Render HTML
 
 ```bash
 node bin/hrth.mjs render solution.json solution.html
 ```
 
-With compiled diagram artifacts:
+or:
 
 ```bash
 node bin/hrth.mjs render solution.json solution.html --diagram-dir .hrth/diagrams
 ```
 
-The renderer must compose Blocks into Reading Groups rather than flattening them into first-level chapters.
+V2 reader-facing group titles come from `view.groups[].title` while stable narrative slots continue to control the current renderer layout and progressive disclosure behavior.
 
-Default exposure:
+## 13. Useful V2 commands
 
-- `core` → visible in the main reading flow;
-- `detail` → grouped under implementation details and collapsed by default where appropriate;
-- `reference` → appendix/reference area;
-- Evidence/assumptions/unknowns → appendix, never the main narrative.
+List built-in Concern Packs:
 
-The first screen must lead with the bottom line and key changes, not internal metrics such as Block/diagram counts.
+```bash
+node bin/hrth.mjs concerns
+```
 
-Block `reason` is generator/reviewer metadata. Do not render it as a repeated reader-facing “为什么保留” paragraph.
+Inspect the compiled compatibility runtime form:
 
-When a diagram manifest hash does not match the current `representation.spec`, or a supplied receipt is invalid, do not embed the artifact. Fall back honestly to the semantic representation and surface a review warning.
+```bash
+node bin/hrth.mjs compile solution.v2.json compiled.v1.json
+```
 
-### 13. Handoff discipline
+`compile` is for debugging/inspection; the V2 source remains authoritative.
+
+## 14. Handoff discipline
 
 Before delivery:
 
-- run review again;
-- ensure simple changes stayed simple;
-- ensure the BLUF actually states the selected solution rather than summarizing only background;
-- ensure a reviewer can understand why/what/how from the core reading groups without opening details;
-- ensure implementation detail is available without dominating the first read;
-- ensure every diagram and decision has a material reason;
-- ensure material Block conclusions can point to their evidence ids where needed;
-- state unresolved material unknowns honestly;
-- report whether diagrams are compiled Archify/Mermaid artifacts or semantic fallbacks;
-- never hide a stale or unverifiable diagram artifact behind a successful-looking page.
+- run validate and review;
+- ensure the selected solution is stated in the brief;
+- ensure no activated material Concern is silently skipped;
+- ensure Model Blocks contain no View metadata;
+- ensure the Understand path is bounded and question-oriented;
+- ensure Implement/Reference content is available without dominating the first read;
+- ensure every diagram and real decision earns its place;
+- ensure material conclusions can point to Evidence where needed;
+- state unresolved unknowns honestly;
+- report whether diagrams are compiled artifacts or semantic fallbacks.
 
-## Regression anchors
+# Regression anchors
 
-Use the three Golden Cases when changing scoping, narrative planning, routing, rendering, or review behavior:
+Use these examples when changing the compiler:
 
-- `examples/01-simple-field`: low pressure, 0 diagrams, first-level reading groups <= 3;
-- `examples/02-redis-cache`: medium pressure, intentionally 0 diagrams, first-level reading groups <= 5;
-- `examples/03-kafka-async`: high pressure, exactly 2 justified Archify diagrams, first-level reading groups <= 6 even though it has many semantic Blocks.
+- `01-simple-field` — V1 low-pressure compatibility;
+- `02-redis-cache` — V1 medium-pressure no-diagram anchor;
+- `03-kafka-async` — V1 high-pressure compatibility;
+- `04-kafka-v2` — V2 Model/View/Document AST, Concern coverage and multiple presentations.
 
-Negative validation and stale-artifact regressions live in `tests/validation.mjs`.
+Run:
 
-Run `npm test` after changes.
+```bash
+npm test
+```
+
+# Explicit non-goals
+
+Do not turn V2 into:
+
+- a fixed 10/12-section template;
+- a system where every plugin invents new Block vocabulary;
+- an all-concerns-on-by-default checklist;
+- a full architecture knowledge base;
+- an AI second-review service added only to score prose similarity;
+- a renderer-heavy design system whose visual complexity exceeds the technical value.
+
+The architecture may become heavier. The generated reading experience should become lighter.

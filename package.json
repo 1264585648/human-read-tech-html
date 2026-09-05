@@ -1,15 +1,15 @@
 {
   "name": "human-read-tech-html",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Minimum-sufficient technical solution scoping, review and self-contained HTML rendering.",
+  "description": "Evidence-backed technical solution compiler with layered model, narrative planning and human-readable HTML rendering.",
   "bin": { "hrth": "./bin/hrth.mjs" },
   "scripts": {
     "validate": "node ./bin/hrth.mjs validate",
     "review": "node ./bin/hrth.mjs review",
     "render": "node ./bin/hrth.mjs render",
-    "test": "node ./tests/golden.mjs && node ./tests/validation.mjs"
+    "test": "node ./tests/golden.mjs && node ./tests/validation.mjs && node ./tests/v2.mjs"
   },
   "engines": { "node": ">=20" },
   "license": "MIT"

@@ -1,0 +1,14 @@
+{
+  "id": "cache",
+  "title": "缓存",
+  "questions": [
+    { "id": "key-design", "question": "缓存 Key 的组成、隔离维度和版本策略是什么？" },
+    { "id": "ttl-staleness", "question": "TTL 和允许的数据陈旧窗口是什么？" },
+    { "id": "invalidation", "question": "缓存失效由谁触发，更新与删除失败时如何处理？" },
+    { "id": "penetration", "question": "不存在的数据如何避免持续穿透到数据源？" },
+    { "id": "breakdown", "question": "热点 Key 失效时如何避免击穿？" },
+    { "id": "avalanche", "question": "大量 Key 同时过期或缓存整体不可用时如何降级？" },
+    { "id": "consistency", "question": "缓存与事实源的一致性边界和读写顺序是什么？" },
+    { "id": "capacity", "question": "容量、命中率、淘汰策略和监控边界是什么？" }
+  ]
+}
