@@ -1,98 +1,111 @@
 # Reading Rules
 
-The solution model is written for machines and agents; the final artifact is written for people. Do not expose the internal Block list as the reader's chapter list.
+The Solution Model is written for machines and agents; the final artifact is written for people.
+
+V2 therefore separates **technical semantics** from **human reading order**.
 
 ## Design laws
 
 1. **Decision usefulness over completeness.** Include only information that changes implementation, review, rollout, verification, or an important decision.
-2. **Bottom line before background.** State the proposed solution before long context or analysis.
-3. **Progressive disclosure over full exposure.** A reader should be able to stop after 30 seconds, 3 minutes, or continue into implementation details without losing coherence.
-4. **Blocks are semantic units, not chapters.** Blocks may be regrouped, nested, collapsed, or moved to an appendix without changing their technical meaning.
-5. **Group by reader questions, not data types.** Prefer "方案怎么工作" over a flat sequence such as "接口 / 数据 / 非功能".
-6. **Conclusion → reasons → evidence.** Lead with the decision or design conclusion, then explain why, then expose proof or source material.
-7. **One view, one main story.** A section, table, card group, or diagram should have one dominant purpose.
-8. **Complexity may increase depth, not first-read burden.** High-pressure systems may contain more detail, but the first read must stay bounded.
+2. **Bottom line before background.** State the selected solution before long context or analysis.
+3. **Progressive disclosure over full exposure.** A reader should be able to stop after Scan, Understand, Implement or Reference depth without losing coherence.
+4. **Blocks are semantic units, not chapters.** V2 Model Blocks contain no reading metadata.
+5. **Group by reader questions, not data types.** Prefer “新方案怎么工作” over a flat “接口 / 数据 / 非功能” taxonomy.
+6. **Conclusion → reasons → evidence.** Lead with the conclusion, then rationale, then proof/source material.
+7. **One view, one main story.** A section, table, card group or diagram should have one dominant purpose.
+8. **Complexity may increase depth, not first-read burden.** More implementation detail should move deeper rather than expand the first pass without bound.
 
-These rules intentionally borrow the useful parts of BLUF / inverted-pyramid writing, the Minto Pyramid Principle, progressive disclosure, information scent, chunking, C4-style zoom levels, signal-to-noise reduction, and lightweight MADR decision writing. Do not import their full templates.
+These rules borrow useful ideas from BLUF / inverted pyramid, the Minto Pyramid Principle, progressive disclosure, information scent, chunking, C4-style zoom levels and signal-to-noise reduction without importing their full templates.
 
-## Three reading depths
+## Four reading depths
 
 ### Scan — about 30 seconds
 
-The first screen must answer:
+Use `view.brief` in V2 (legacy `brief` in V1).
+
+It should answer:
 
 - what are we proposing;
 - what changes materially;
 - what is affected;
-- what are the biggest risks or constraints;
-- how will it be rolled out / verified when that matters.
+- what are the biggest risks/constraints;
+- how will rollout/verification work when relevant.
 
-Use `brief` for this layer. It is a compact index of the solution, not a second copy of the body.
+The brief is a compact index, not a second copy of the report.
 
-### Understand — about 3 minutes
+### Understand — about 3–5 minutes
 
-A reviewer should understand the core design and the most challengeable decision without opening implementation details.
+Use `layer: "understand"`.
 
-Default groups:
+A reviewer should understand the selected design and the most challengeable decision without opening implementation details.
 
-- `overview` → **先看结论**
-- `design` → **方案怎么工作**
-- `decisions` → **为什么这样设计**
-- `delivery` → **如何安全上线**
+Good first-level reader questions:
 
-Only groups that contain material content should appear.
+- 这次到底改变了什么
+- 新方案怎么工作
+- 为什么这样设计
+- 哪些边界最重要
+- 怎么安全上线并证明可恢复
+
+Not every solution needs every question as a separate group.
 
 ### Implement — on demand
 
-Implementation-specific material belongs under:
+Use `layer: "implement"` for implementation lookup:
 
-- `details` → **实现细节**
-- `appendix` → **依据与附录**
+- exhaustive interface contracts;
+- storage fields;
+- configuration;
+- timeout/retry values;
+- secondary flows;
+- migration/runbook details;
+- test matrices;
+- operational thresholds.
 
-Typical detail/reference material includes exhaustive interfaces, storage fields, operational thresholds, secondary flows, test matrices, evidence, assumptions, unknowns, and research sources.
+This layer may be heavy. It should simply not dominate the first read.
 
-## Reading roles
+### Reference — on demand
 
-Each Block may declare:
+Use `layer: "reference"` for:
 
-- `core` — required to understand the solution on the first serious read;
-- `detail` — required for implementation or deep review, but not for the first pass;
-- `reference` — consulted only to verify evidence, assumptions, unknowns, or exhaustive definitions.
+- Evidence;
+- Assumptions;
+- Unknowns;
+- research sources;
+- exhaustive definitions used for verification rather than understanding.
 
-`importance` and `reading.role` are different:
+## V2 View Groups
 
-- `importance` asks whether the information matters technically;
-- `reading.role` asks when the reader needs to see it.
+A V2 View Group separates reader-facing title from compiler slot:
 
-A technically high-importance interface contract can still be `detail`.
+```json
+{
+  "id": "working-model",
+  "title": "新方案怎么工作",
+  "layer": "understand",
+  "slot": "design",
+  "items": []
+}
+```
 
-## Default planning hints
+`title` is reader-facing information scent.
 
-These are defaults, not fixed mappings:
+`slot` is a bounded compiler/layout vocabulary used by the current renderer:
 
-| Block type | Default role | Default group |
-|---|---|---|
-| summary / context / goals / change_set | core | overview |
-| architecture / primary flow | core | design |
-| decisions | core | decisions |
-| rollout / verification / material risks | core | delivery |
-| interfaces | detail | details |
-| data | detail | details |
-| non_functional | detail | details |
-| evidence / assumptions / unknowns | reference | appendix |
+- `overview`
+- `design`
+- `decisions`
+- `delivery`
+- `details`
+- `appendix`
 
-Promote detail to core when it is the load-bearing subject of the change. Examples:
-
-- database migration → `data` may be `core/design`;
-- API compatibility project → `interfaces` may be `core/design`;
-- performance/capacity project → `non_functional` may be `core/design`;
-- call-chain correctness project → the relevant `flow` / `interfaces` may be `core/design`.
+Slots are not mandatory chapters. Empty slots do not render.
 
 ## Reading budget
 
-Reading budget is separate from content budget.
+Reading Budget remains separate from Content Budget.
 
-| Pressure | First-level groups | Brief information points | Core Blocks |
+| Pressure | First-level groups | Brief information points | Understand presentation nodes |
 |---|---:|---:|---:|
 | low | <= 3 | <= 5 | <= 5 |
 | medium | <= 5 | <= 7 | <= 7 |
@@ -100,22 +113,24 @@ Reading budget is separate from content budget.
 
 Count a brief information point as the bottom line, each key change, impact when present, each key risk, and delivery when present.
 
-If the solution needs more information than the reading budget allows, move it deeper. Do not delete material engineering detail just to satisfy a first-read budget.
+For V2, presentation nodes are the actual pieces shown to the reader. One semantic Block may contribute multiple nodes when each adds distinct reading value.
+
+If the solution needs more engineering detail than the reading budget allows, move it to Implement/Reference. Do not delete material engineering detail merely to satisfy a first-read budget.
 
 ## Information scent
 
-First-level group names should tell the reader why they would open the group. Prefer question/decision-oriented labels over internal taxonomy.
+Reader-facing group names should tell the reader why they would open the group.
 
 Good:
 
-- 先看结论
-- 方案怎么工作
+- 这次到底改变了什么
+- 新方案怎么工作
 - 为什么这样设计
-- 如何安全上线
-- 实现细节
-- 依据与附录
+- 怎么安全上线并证明可恢复
+- 实施时再看这些细节
+- 依据与待确认
 
-Avoid exposing a long first-level sequence such as:
+Avoid exposing internal taxonomy directly as a long first-level list:
 
 - 背景
 - 架构
@@ -127,25 +142,58 @@ Avoid exposing a long first-level sequence such as:
 - 测试
 - 灰度
 
-Those may remain Blocks internally, but they should be composed into a smaller reading structure.
+Those remain technical semantics in the Model and may be composed into fewer reader questions.
 
 ## Signal-to-noise
 
-- Do not repeat the same conclusion in summary text, cards, body text, and a diagram.
-- If a diagram already communicates topology/order, prose should explain the reason, boundary, or exception rather than narrate every edge again.
-- Evidence IDs are machine metadata; show human-readable evidence text in the reading flow and keep raw IDs as metadata.
-- Block `reason` explains why the Block exists to the generator/reviewer. It is not reader-facing body content and should not be rendered as a repeated paragraph.
+- Do not repeat the same conclusion in the brief, paragraph, card, table and diagram unless each occurrence adds a distinct role.
+- If a diagram communicates topology/order, surrounding prose should explain rationale, boundary, exception or consequence rather than narrating every edge.
+- Evidence IDs are machine metadata; show human-readable evidence text and keep raw IDs as metadata.
+- Block `reason` explains why the semantic Block exists to the generator/reviewer. It is not reader-facing body copy.
 
-## Narrative Planner
+## Multiple presentations
 
-After semantic Blocks are selected and before representation is finalized:
+V2 intentionally allows one semantic Block to have several Presentation Nodes.
 
-1. write/refresh the BLUF `brief` from the chosen solution;
-2. assign each Block a reading `role` and `group`;
-3. keep the number of first-level groups within the reading budget;
-4. promote only load-bearing detail to `core`;
-5. move evidence/reference material to `appendix`;
-6. remove obvious duplicate exposition;
-7. verify that the first three visible groups answer why, what, how, and the main trade-off/risk.
+Good example:
 
-The Narrative Planner must not invent technical facts or new components. It only changes exposure order and presentation depth.
+```text
+Architecture Block
+  ├─ architecture diagram → relationships/boundaries
+  └─ short text → the one failure-isolation consequence the reader must remember
+```
+
+Bad example:
+
+```text
+Architecture Block
+  ├─ diagram
+  ├─ paragraph narrating every edge
+  ├─ table repeating the same components
+  └─ cards repeating the same conclusion
+```
+
+Every additional Presentation Node must add a different reading job.
+
+## Narrative planning steps
+
+After the Solution Model is selected and before representation is finalized:
+
+1. write/refresh the BLUF brief;
+2. identify the smallest set of reader questions needed for Understand;
+3. place implementation-specific material into Implement;
+4. move Evidence/reference material into Reference;
+5. assign stable narrative slots for the current renderer;
+6. remove duplicate exposition;
+7. only then select Presentation Nodes;
+8. verify that the Understand path answers why / what / how / main trade-off / delivery risk as needed.
+
+The Narrative Planner must not invent technical facts or components. It changes exposure order and presentation depth only.
+
+## V1 compatibility
+
+SchemaVersion `0.1` continues to use Block-level `reading.role` and `reading.group` metadata.
+
+Those fields are a compatibility runtime mechanism, not the preferred V2 authoring model.
+
+For new V2 solutions, keep reading metadata exclusively in `view.groups[]` and let the compiler derive V1 runtime placement when needed.
